@@ -288,14 +288,11 @@ private:
 
     hal::gpu::fill(region, 0x0000);
 
-    // Render HP text
-    Font::regular_font().render_colored(hp_text, -1, region, 1, 1, 0xFFFF);
-
-    // Render HP bar
+    // Render HP bar first
     u32 bar_width = 100;
     u32 bar_height = 8;
     u32 bar_x = 1;
-    u32 bar_y = 1;
+    u32 bar_y = 5;
 
     // Draw HP bar background
     for (u32 y = bar_y; y < bar_y + bar_height && y < region.get_height();
