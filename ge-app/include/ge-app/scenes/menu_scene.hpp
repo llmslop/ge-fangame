@@ -33,17 +33,17 @@ public:
 
   void tick(float dt) override {
     auto joystick = app.get_joystick_state();
-    menu.move_selection(-joystick.y);
+    menu.move_selection(joystick.y);
   }
 
   void render(Surface &fb_region) override {
     hal::gpu::blit(fb_region, menu_bg_texture);
 
-    Font::regular_font().render_colored(subtitle, -1, fb_region, 40, 45,
+    Font::regular_font().render_colored(subtitle, -1, fb_region, 80, 90,
                                         0xFFFF);
 
     // Render menu
-    auto menu_region = fb_region.subsurface(0, 100, fb_region.get_width(),
+    auto menu_region = fb_region.subsurface(0, 96, fb_region.get_width(),
                                             fb_region.get_height() - 100);
     menu.render(menu_region, Font::regular_font());
   }
@@ -65,7 +65,6 @@ private:
   ui::Menu menu;
   ui::MenuItem menu_items[4];
   const char *subtitle = "A Fangame by CTB Girls' Dorm.";
-
   Texture menu_bg_texture{menu_bg, menu_bg_WIDTH, menu_bg_HEIGHT,
                           PixelFormat::RGB565};
 };

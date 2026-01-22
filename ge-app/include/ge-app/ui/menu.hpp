@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ge-app/font.hpp"
+#include "ge-app/gfx/shape_utils.hpp"
 #include "ge-hal/app.hpp"
 #include "ge-hal/core.hpp"
 #include "ge-hal/gpu.hpp"
@@ -50,34 +51,20 @@ public:
           region.subsurface(padding, y_pos - padding,
                             region.get_width() - padding * 2, item_height);
 
-      if (i == selected_index) {
-        auto color = 0x0000;
-        // Draw a simple border around selected item
-        // Draw border by drawing 4 lines
-        hal::gpu::fill(item_region.subsurface(0, 0, item_region.get_width(), 2),
-                       color);
-        hal::gpu::fill(item_region.subsurface(0, item_region.get_height() - 2,
-                                              item_region.get_width(), 2),
-                       color);
-        hal::gpu::fill(
-            item_region.subsurface(0, 0, 2, item_region.get_height()), color);
-        hal::gpu::fill(item_region.subsurface(item_region.get_width() - 2, 0, 2,
-                                              item_region.get_height()),
-                       color);
-      }
+      if (i == selected_index)
+        draw_rect(item_region, 0x0000);
 
       // Just render text at left aligned position, let renderer handle it
-      u16 color = (i == selected_index) ? 0x0000 : 0xBDF7; // white or gray
-      font.render_colored(items[i].label, -1, item_region, 10, 2, color);
+      u16 color = (i == selected_index) ? 0x0000 : 0x39E7; // black or gray
+      font.render_colored(items[i].label, -1, item_region, 10, 3, color);
     }
   }
 
-  void move_selection(float joy_y) {
-    if (!items || item_count == 0)
+  static void joystick_move_logic(float joy_y, bool &joy_moved,
+                                  u32 &selected_index, u32 item_count) {
+    if (item_count == 0)
       return;
-
-    // Use joystick Y axis to move selection
-    // Only trigger on significant movement to avoid jitter
+    joy_y = -joy_y; // Invert Y axis for intuitive navigation
     if (joy_y < -JOY_THRESHOLD_MOVE && !joy_moved) {
       selected_index =
           (selected_index > 0) ? selected_index - 1 : item_count - 1;
@@ -89,6 +76,12 @@ public:
       // Reset joy_moved when joystick returns to center
       joy_moved = false;
     }
+  }
+
+  void move_selection(float joy_y) {
+    // Use joystick Y axis to move selection
+    // Only trigger on significant movement to avoid jitter
+    joystick_move_logic(joy_y, joy_moved, selected_index, item_count);
   }
 
   int get_selected_id() const {

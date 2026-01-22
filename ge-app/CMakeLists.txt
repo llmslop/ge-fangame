@@ -12,7 +12,11 @@ target_sources(
         ${CMAKE_CURRENT_SOURCE_DIR}/include/ge-app/scenes/menu_scene.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/ge-app/scenes/gameover_scene.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/ge-app/game/obstacle.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/ge-app/scenes/settings_scene.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/ge-app/scenes/credits_scene.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/ge-app/ui/menu.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/ge-app/ui/slider.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/ge-app/ui/option_selector.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/ge-app/font.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/ge-app/game/water.cpp

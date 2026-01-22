@@ -5,3 +5,4 @@ __pycache__
 .envrc
 /.pre-commit-config.yaml
 /.neocmake.toml
+/_codeql_detected_source_root

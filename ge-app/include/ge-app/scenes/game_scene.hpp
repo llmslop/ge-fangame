@@ -6,6 +6,7 @@
 #include "ge-app/game/compass.hpp"
 #include "ge-app/game/dock.hpp"
 #include "ge-app/game/obstacle.hpp"
+#include "ge-app/game/fishing.hpp"
 #include "ge-app/game/sky.hpp"
 #include "ge-app/game/water.hpp"
 #include "ge-app/gfx/color.hpp"
@@ -98,6 +99,8 @@ public:
     sky.set_cloud_color(ge::hsv_to_rgb565(0, 0, 255));
     water.set_sky_color(ge::hsv_to_rgb565(150, 200, 255));
     water.set_water_color(ge::hsv_to_rgb565(142, 255, 181));
+
+    dialog_box.show_message(app, msg[0].title, msg[0].desc);
   }
 
   void reset() {
@@ -117,11 +120,22 @@ public:
       world_dt = (current_frame_world_time - last_frame_world_time) * 1e-3f;
     }
     last_frame_world_time = current_frame_world_time;
+
+    auto joystick = app.get_joystick_state();
+
     if (mode_indicator.get_current_mode() == GameMode::Steering) {
-      auto joystick = app.get_joystick_state();
-      boat.update_angle(joystick.x, joystick.y, world_dt);
+      if (!dialog_box.has_input_focus()) {
+        boat.update_angle(joystick.x, joystick.y, world_dt);
+      }
+      boat.update_position(app, world_dt);
+    } else if (mode_indicator.get_current_mode() == GameMode::Fishing) {
+      // Update fishing system
+      if (!dialog_box.has_input_focus()) {
+        fishing.update(app, dialog_box, world_dt, joystick);
+      }
+      // Keep boat drifting slowly in fishing mode
+      boat.update_position(app, world_dt);
     }
-    boat.update_position(app, world_dt);
 
     // Check if storm is active (18:00 - 20:00, i.e., 0.75 - 0.833 of day)
     float time_of_day = clock.time_in_day(app);
@@ -169,6 +183,14 @@ public:
           (water_region.get_height() - max_side) / 2, max_side, max_side);
       boat.render(boat_region);
     }
+    // Render fishing line and bobber if in fishing mode
+    if (mode_indicator.get_current_mode() == GameMode::Fishing &&
+        fishing.is_active()) {
+      // Calculate boat center position in water region
+      i32 boat_center_x = 0; // Center of water region (relative coordinates)
+      i32 boat_center_y = 0;
+      fishing.render(water_region, boat_center_x, boat_center_y);
+    }
     {
       auto compass_region =
           fb_region.subsurface(ge::App::WIDTH - compass.get_width() - 10, 10,
@@ -192,13 +214,14 @@ public:
       auto hp_region = fb_region.subsurface(PADDING, PADDING + 32, 120, 15);
       render_hp(hp_region);
     }
-    if (current_msg < sizeof(msg) / sizeof(msg[0])) {
+
+    {
       // bottom, padding 4px
       static constexpr auto dialog_height = 64, dialog_padding = 4;
       auto dialog_region = fb_region.subsurface(
           dialog_padding, ge::App::HEIGHT - dialog_height - dialog_padding,
           ge::App::WIDTH - dialog_padding * 2, dialog_height);
-      dialog_box.render(app, dialog_region, msg[current_msg]);
+      dialog_box.render(app, dialog_region);
     }
 
     auto end_time = app.now();
@@ -206,24 +229,51 @@ public:
     // app.log("Frame time: %ld ms", frame_time);
   }
   void on_button_clicked(Button btn) override {
+    if (dialog_box.has_input_focus()) {
+      if (btn == Button::Button2) {
+        dialog_box.dismiss();
+        // tutorial messages
+        if (++current_msg < sizeof(msg) / sizeof(msg[0])) {
+          dialog_box.show_message(app, msg[current_msg].title,
+                                  msg[current_msg].desc);
+        } else {
+          current_msg = sizeof(msg) / sizeof(msg[0]); // No more messages
+        }
+      } else if (btn == Button::Button1) {
+        if (dialog_box.message_complete(app)) {
+          dialog_box.dismiss();
+          // tutorial messages
+          if (++current_msg < sizeof(msg) / sizeof(msg[0])) {
+            dialog_box.show_message(app, msg[current_msg].title,
+                                    msg[current_msg].desc);
+          } else {
+            current_msg = sizeof(msg) / sizeof(msg[0]); // No more messages
+          }
+        } else {
+          dialog_box.set_start_time();
+        }
+
+        return;
+      }
+    }
+
     if (btn == Button::Button2) {
       mode_indicator.switch_mode();
       clock.set_multiplier(app, mode_indicator.get_current_mode());
     } else if (btn == Button::Button1) {
-      if (current_msg < sizeof(msg) / sizeof(msg[0])) {
-        if (dialog_box.message_complete(app, msg[current_msg])) {
-          // advance to next message
-          current_msg++;
-          dialog_box.set_start_time(app.now());
-        } else {
-          // fast-forward current message
-          dialog_box.set_start_time();
-        }
+      // Handle fishing dialog dismissal first (input focus)
+      if (mode_indicator.get_current_mode() == GameMode::Fishing) {
+        // No dialog focus, handle fishing actions
+        fishing.on_button_clicked(app, dialog_box, btn);
       }
     }
   }
 
   void on_button_held(Button btn) override {
+    if (dialog_box.has_input_focus()) {
+      return; // Ignore held buttons when dialog has focus
+    }
+
     if (btn == Button::Button2) {
       clock.begin_sped_up();
       clock.set_multiplier(app, mode_indicator.get_current_mode());
@@ -231,6 +281,10 @@ public:
   }
 
   void on_button_finished_hold(Button btn) override {
+    if (dialog_box.has_input_focus()) {
+      return; // Ignore held buttons when dialog has focus
+    }
+
     if (btn == Button::Button2) {
       clock.end_sped_up();
       clock.set_multiplier(app, mode_indicator.get_current_mode());
@@ -322,6 +376,7 @@ private:
   Timer main_timer;
   Sky sky;
   Water water;
+  Fishing fishing;
 
   DialogBox dialog_box;
   DialogMessage msg[3] = {

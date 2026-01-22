@@ -42,10 +42,6 @@ public:
     int x = x0, y = y0;
     const int max_x = region.get_width(), max_y = region.get_height();
 
-    auto set_pixel = [&, x, y](int dx, int dy, u16 color) {
-      region.set_pixel(x + dx, y + dy, color);
-    };
-
     auto measure_word = [&](const char *p) {
       int w = 0;
       for (; *p && *p != ' ' && *p != '\n'; ++p) {
@@ -105,7 +101,7 @@ public:
 
             if (pixel_on) {
               auto color = cb(GlyphContext{ch, gx, gy, glyph_w, glyph_h, x, y});
-              set_pixel(x + gx, y + gy, color);
+              region.set_pixel(x + gx, y + gy, color);
             }
           }
         }
@@ -119,6 +115,19 @@ public:
                       int y, std::uint16_t color) const {
     render(text, max_len, region, x, y,
            [color](const GlyphContext &) { return color; });
+  }
+
+  u32 text_width(const char *text, u32 max_len) const {
+    u32 width = 0;
+    for (auto ch = *text; ch && max_len; ch = *++text, --max_len) {
+      u8 const *glyph_data;
+      u8 glyph_w, glyph_h, advance;
+      bool has_glyph = get_glyph(ch, glyph_data, glyph_w, glyph_h, advance);
+      if (!has_glyph)
+        advance = default_advance();
+      width += advance;
+    }
+    return width;
   }
 
 private:

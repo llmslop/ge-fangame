@@ -15,7 +15,9 @@ class DialogBox {
 public:
   DialogBox() = default;
 
-  void render(App &app, Surface region, const DialogMessage &msg) {
+  void render(App &app, Surface region) {
+    if (!has_message)
+      return;
     static constexpr u32 PADDING = 4;
     hal::gpu::fill(region, 0x0000);
     region =
@@ -33,13 +35,36 @@ public:
   // default: show everything
   void set_start_time(i64 time = -1e12) { start_time = time; }
 
-  bool message_complete(App &app, const DialogMessage &msg) {
-    return (app.now() - start_time) / ms_per_char >= strlen(msg.desc);
+  bool message_complete(App &app) {
+    return !has_message ||
+           (app.now() - start_time) / ms_per_char >= strlen(msg.desc);
+  }
+
+  // Show a message with input focus (blocks other input)
+  void show_message(App &app, const char *title, const char *desc) {
+    msg = {title, desc};
+    has_message = true;
+    start_time = app.now();
+  }
+
+  // Check if dialog has input focus
+  bool has_input_focus() const { return has_message; }
+
+  void dismiss() {
+    msg = {"", ""};
+    has_message = false;
+  }
+
+  // Get the current pending message
+  const DialogMessage *get_pending_message() const {
+    return has_message ? &msg : nullptr;
   }
 
 private:
   i64 start_time = 0;
   i64 ms_per_char = 50;
+  DialogMessage msg = {"", ""};
+  bool has_message = false;
 };
 
 } // namespace ge
