@@ -268,10 +268,15 @@ private:
   }
 
   void check_collisions() {
-    const auto &obstacles = obstacle_manager.get_obstacles();
-    for (const auto &obstacle : obstacles) {
-      if (obstacle.collides_with(boat.get_x(), boat.get_y(), 20.0f)) {
-        boat.take_damage(obstacle.get_damage());
+    auto &obstacles_vec = obstacle_manager.get_obstacles();
+    
+    // Check collision and mark for removal
+    for (auto it = obstacles_vec.begin(); it != obstacles_vec.end();) {
+      if (it->collides_with(boat.get_x(), boat.get_y(), 20.0f)) {
+        boat.take_damage(it->get_damage());
+        it = obstacles_vec.erase(it); // Remove obstacle after collision
+      } else {
+        ++it;
       }
     }
   }

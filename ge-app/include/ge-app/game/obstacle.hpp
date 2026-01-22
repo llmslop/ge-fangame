@@ -5,6 +5,7 @@
 #include "ge-app/gfx/color.hpp"
 #include <cmath>
 #include <vector>
+#include <algorithm>
 
 namespace ge {
 
@@ -192,6 +193,7 @@ public:
   }
 
   const std::vector<Obstacle> &get_obstacles() const { return obstacles; }
+  std::vector<Obstacle> &get_obstacles() { return obstacles; }
 
   void clear() { obstacles.clear(); }
 
