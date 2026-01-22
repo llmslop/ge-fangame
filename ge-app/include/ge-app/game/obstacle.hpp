@@ -23,6 +23,11 @@ enum class WavePlacementPattern {
   Convergent   // Waves converging from multiple directions
 };
 
+// Rendering constants
+constexpr i32 MIN_OBSTACLE_SIZE = 3;
+constexpr float WHIRLPOOL_PULSE_SPEED = 8.0f;
+constexpr float SHARK_CIRCLE_SPEED = 4.0f;
+
 class Obstacle {
 public:
   Obstacle(float x, float y, float vx, float vy, ObstacleType type,
@@ -43,6 +48,13 @@ public:
     
     initial_x = x;
     initial_y = y;
+    
+    // Initialize damage based on growth phase
+    if (growth_time > 0.0f) {
+      current_damage = 0.0f;  // Start at 0, will grow during first update
+    } else {
+      current_damage = initial_damage;  // Instant full damage if no growth time
+    }
   }
 
   void update(float dt) {
@@ -170,7 +182,7 @@ public:
     // Render based on type
     u16 color;
     i32 size = (i32)(get_radius());
-    if (size < 3) size = 3;
+    if (size < MIN_OBSTACLE_SIZE) size = MIN_OBSTACLE_SIZE;
 
     switch (type) {
     case ObstacleType::Wave:
@@ -199,7 +211,7 @@ public:
       // During warning phase, show pulsing circle indicator
       if (warning) {
         // Pulsing warning indicator
-        float pulse = 0.5f + 0.5f * std::sin(lifetime * 8.0f);
+        float pulse = 0.5f + 0.5f * std::sin(lifetime * WHIRLPOOL_PULSE_SPEED);
         u16 warn_color = ge::blend_rgb565(0x001F, 0x07FF, (u8)(pulse * 255));
         i32 warn_size = (i32)(size * (0.5f + 0.5f * growth));
         
@@ -255,7 +267,7 @@ public:
       // During warning phase, show fin circling indicator
       if (warning) {
         // Circling fin warning
-        float circle_angle = lifetime * 4.0f; // Circle 4 times during warning
+        float circle_angle = lifetime * SHARK_CIRCLE_SPEED;
         i32 circle_radius = size + 10;
         i32 fin_x = screen_x + (i32)(std::cos(circle_angle) * circle_radius);
         i32 fin_y = screen_y + (i32)(std::sin(circle_angle) * circle_radius);
