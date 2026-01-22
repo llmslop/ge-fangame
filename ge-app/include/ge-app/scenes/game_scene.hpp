@@ -6,11 +6,13 @@
 #include "ge-app/game/compass.hpp"
 #include "ge-app/game/dock.hpp"
 #include "ge-app/game/fishing.hpp"
+#include "ge-app/game/obstacle.hpp"
 #include "ge-app/game/sky.hpp"
 #include "ge-app/game/water.hpp"
 #include "ge-app/gfx/color.hpp"
 #include "ge-app/gfx/dialog_box.hpp"
 #include "ge-app/scenes/scene.hpp"
+#include <cstdlib>
 
 namespace ge {
 struct HSV {
@@ -101,6 +103,16 @@ public:
     dialog_box.show_message(app, msg[0].title, msg[0].desc);
   }
 
+  void reset() {
+    // Reset boat position and HP
+    boat = Boat();
+    // Clear obstacles
+    obstacle_manager.clear();
+    spawn_cooldown = 0.0f;
+  }
+
+  bool is_game_over() const { return !boat.is_alive(); }
+
   void tick(float dt) override {
     auto current_frame_world_time = clock.get_day_timer().get(app);
     float world_dt = 0.0f;
@@ -124,6 +136,27 @@ public:
       // Keep boat drifting slowly in fishing mode
       boat.update_position(app, world_dt);
     }
+
+    // Check if storm is active (13:00 - 18:00, i.e., 0.542 - 0.75 of day)
+    // 1PM = 13/24 = 0.542, 6PM = 18/24 = 0.75
+    float time_of_day = clock.time_in_day(app);
+    bool is_storm = (time_of_day >= 0.542f && time_of_day <= 0.75f);
+
+    if (is_storm) {
+      // Spawn obstacles during storm
+      spawn_cooldown -= world_dt;
+      if (spawn_cooldown <= 0.0f) {
+        spawn_random_obstacle();
+        spawn_cooldown = 2.0f; // Spawn every 2 seconds
+      }
+    }
+
+    // Update obstacles
+    obstacle_manager.update(world_dt, boat.get_x(), boat.get_y(),
+                            ge::App::WIDTH, ge::App::HEIGHT);
+
+    // Check collisions
+    check_collisions();
   }
 
   void render(Surface &fb_region) override {
@@ -135,6 +168,10 @@ public:
     sky.render(fb_region.subsurface(0, 0, ge::App::WIDTH, 80));
     water.render(water_region, app.now() * 1e-3, boat.get_x(), boat.get_y());
     dock.render(app, fb_region, boat.get_x(), boat.get_y());
+
+    // Render obstacles
+    obstacle_manager.render(water_region, boat.get_x(), boat.get_y());
+
     font.render("Hello, World!", -1, fb_region, 10, 10,
                 [](const ge::GlyphContext &g) {
                   uint8_t hue = (uint8_t)(g.x + g.gx);
@@ -172,6 +209,12 @@ public:
           fb_region.subsurface(PADDING, PADDING + 16, 120, 15);
       mode_indicator.render(mode_indicator_region);
     }
+    // Render HP bar
+    {
+      static constexpr u32 PADDING = 4;
+      auto hp_region = fb_region.subsurface(PADDING, PADDING + 32, 120, 15);
+      render_hp(hp_region);
+    }
 
     {
       // bottom, padding 4px
@@ -197,6 +240,8 @@ public:
         } else {
           current_msg = sizeof(msg) / sizeof(msg[0]); // No more messages
         }
+
+        return;
       } else if (btn == Button::Button1) {
         if (dialog_box.message_complete(app)) {
           dialog_box.dismiss();
@@ -250,6 +295,213 @@ public:
   }
 
 private:
+  void spawn_wave_pattern() {
+    // Choose a random placement pattern
+    int pattern_rand = std::rand() % 100;
+    WavePlacementPattern pattern;
+
+    if (pattern_rand < 40) {
+      pattern = WavePlacementPattern::Single;
+    } else if (pattern_rand < 70) {
+      pattern = WavePlacementPattern::Barrier;
+    } else if (pattern_rand < 90) {
+      pattern = WavePlacementPattern::Scattered;
+    } else {
+      pattern = WavePlacementPattern::Convergent;
+    }
+
+    switch (pattern) {
+    case WavePlacementPattern::Single:
+      spawn_single_wave();
+      break;
+    case WavePlacementPattern::Barrier:
+      spawn_wave_barrier();
+      break;
+    case WavePlacementPattern::Scattered:
+      spawn_scattered_waves();
+      break;
+    case WavePlacementPattern::Convergent:
+      spawn_convergent_waves();
+      break;
+    }
+  }
+
+  void spawn_single_wave() {
+    // Single wave coming from random direction
+    float angle = (std::rand() % 360) * M_PI / 180.0f;
+    float spawn_distance = 200.0f + (std::rand() % 100);
+
+    float spawn_x = boat.get_x() + spawn_distance * std::cos(angle);
+    float spawn_y = boat.get_y() + spawn_distance * std::sin(angle);
+
+    // Move towards boat
+    float target_angle =
+        std::atan2(boat.get_y() - spawn_y, boat.get_x() - spawn_x);
+    float speed = 25.0f + (std::rand() % 15);
+    float vx = speed * std::cos(target_angle);
+    float vy = speed * std::sin(target_angle);
+
+    obstacle_manager.spawn_obstacle(spawn_x, spawn_y, vx, vy,
+                                    ObstacleType::Wave);
+  }
+
+  void spawn_wave_barrier() {
+    // Line of waves with gaps - creates a barrier the player must navigate
+    float angle = (std::rand() % 360) * M_PI / 180.0f;
+    float spawn_distance = 250.0f;
+
+    // Perpendicular direction for the barrier line
+    float perp_angle = angle + M_PI / 2;
+
+    // Spawn 5-7 waves in a line with gaps
+    int num_waves = 5 + (std::rand() % 3);
+    float spacing = 50.0f;   // Space between waves
+    float gap_chance = 0.3f; // 30% chance of gap
+
+    for (int i = 0; i < num_waves; i++) {
+      // Skip some waves to create gaps
+      if ((std::rand() % 100) < (gap_chance * 100)) {
+        continue;
+      }
+
+      float offset = (i - num_waves / 2.0f) * spacing;
+      float spawn_x = boat.get_x() + spawn_distance * std::cos(angle) +
+                      offset * std::cos(perp_angle);
+      float spawn_y = boat.get_y() + spawn_distance * std::sin(angle) +
+                      offset * std::sin(perp_angle);
+
+      // All waves move in same direction (perpendicular to barrier)
+      float speed = 20.0f + (std::rand() % 10);
+      float vx = speed * std::cos(angle);
+      float vy = speed * std::sin(angle);
+
+      obstacle_manager.spawn_obstacle(spawn_x, spawn_y, vx, vy,
+                                      ObstacleType::Wave);
+    }
+  }
+
+  void spawn_scattered_waves() {
+    // Multiple waves from random directions
+    int num_waves = 3 + (std::rand() % 3); // 3-5 waves
+
+    for (int i = 0; i < num_waves; i++) {
+      float angle = (std::rand() % 360) * M_PI / 180.0f;
+      float spawn_distance = 180.0f + (std::rand() % 120);
+
+      float spawn_x = boat.get_x() + spawn_distance * std::cos(angle);
+      float spawn_y = boat.get_y() + spawn_distance * std::sin(angle);
+
+      float target_angle =
+          std::atan2(boat.get_y() - spawn_y, boat.get_x() - spawn_x);
+      float speed = 22.0f + (std::rand() % 12);
+      float vx = speed * std::cos(target_angle);
+      float vy = speed * std::sin(target_angle);
+
+      obstacle_manager.spawn_obstacle(spawn_x, spawn_y, vx, vy,
+                                      ObstacleType::Wave);
+    }
+  }
+
+  void spawn_convergent_waves() {
+    // Waves from multiple directions converging on player
+    int num_directions = 3 + (std::rand() % 2); // 3-4 directions
+
+    for (int i = 0; i < num_directions; i++) {
+      float angle = (i * 2 * M_PI / num_directions) +
+                    (std::rand() % 60 - 30) * M_PI / 180.0f;
+      float spawn_distance = 220.0f;
+
+      float spawn_x = boat.get_x() + spawn_distance * std::cos(angle);
+      float spawn_y = boat.get_y() + spawn_distance * std::sin(angle);
+
+      float target_angle =
+          std::atan2(boat.get_y() - spawn_y, boat.get_x() - spawn_x);
+      float speed = 23.0f + (std::rand() % 10);
+      float vx = speed * std::cos(target_angle);
+      float vy = speed * std::sin(target_angle);
+
+      obstacle_manager.spawn_obstacle(spawn_x, spawn_y, vx, vy,
+                                      ObstacleType::Wave);
+    }
+  }
+
+  void spawn_random_obstacle() {
+    // Random obstacle type
+    int type_rand = std::rand() % 10;
+    ObstacleType type;
+    if (type_rand < 5) {
+      type = ObstacleType::Wave; // 50% waves
+    } else if (type_rand < 8) {
+      type = ObstacleType::Whirlpool; // 30% whirlpools
+    } else {
+      type = ObstacleType::Shark; // 20% sharks
+    }
+
+    if (type == ObstacleType::Wave) {
+      // Spawn wave pattern instead of single wave
+      spawn_wave_pattern();
+    } else {
+      // Whirlpools and sharks appear randomly near the boat and stay in place
+      float angle = (std::rand() % 360) * M_PI / 180.0f;
+      float spawn_distance = 50.0f + (std::rand() % 150); // Closer than waves
+
+      float spawn_x = boat.get_x() + spawn_distance * std::cos(angle);
+      float spawn_y = boat.get_y() + spawn_distance * std::sin(angle);
+
+      // No velocity - they don't move
+      obstacle_manager.spawn_obstacle(spawn_x, spawn_y, 0.0f, 0.0f, type);
+    }
+  }
+
+  void check_collisions() {
+    auto &obstacles_vec = obstacle_manager.get_obstacles();
+
+    // Check collision - obstacles only damage once then fade naturally
+    for (auto &obstacle : obstacles_vec) {
+      if (obstacle.can_damage() &&
+          obstacle.collides_with(boat.get_x(), boat.get_y(), 20.0f)) {
+        boat.take_damage(obstacle.get_damage());
+        obstacle.mark_damaged();
+      }
+    }
+  }
+
+  void render_hp(Surface &region) {
+    char hp_text[32];
+    snprintf(hp_text, sizeof(hp_text), "HP: %.0f/%.0f", boat.get_hp(),
+             boat.get_max_hp());
+
+    hal::gpu::fill(region, 0x0000);
+
+    // Render HP bar first
+    u32 bar_width = 100;
+    u32 bar_height = 8;
+    u32 bar_x = 1;
+    u32 bar_y = 5;
+
+    // Draw HP bar background
+    for (u32 y = bar_y; y < bar_y + bar_height && y < region.get_height();
+         y++) {
+      for (u32 x = bar_x; x < bar_x + bar_width && x < region.get_width();
+           x++) {
+        region.set_pixel(x, y, u16{0x3186}); // Dark gray
+      }
+    }
+
+    // Draw HP bar foreground
+    float hp_ratio = boat.get_hp() / boat.get_max_hp();
+    u32 filled_width = (u32)(bar_width * hp_ratio);
+    u16 hp_color =
+        hp_ratio > 0.5f ? 0x07E0 : (hp_ratio > 0.25f ? 0xFFE0 : 0xF800);
+    for (u32 y = bar_y; y < bar_y + bar_height && y < region.get_height();
+         y++) {
+      for (u32 x = bar_x; x < bar_x + filled_width && x < region.get_width();
+           x++) {
+        region.set_pixel(x, y, hp_color);
+      }
+    }
+  }
+
   // Gameplay objects
   Compass compass;
   Boat boat;
@@ -285,5 +537,9 @@ private:
   const ge::Font &font = ge::Font::bold_font();
 
   i64 last_frame_world_time = -1;
+
+  // Storm and obstacle system
+  ObstacleManager obstacle_manager;
+  float spawn_cooldown = 0.0f;
 };
 } // namespace ge

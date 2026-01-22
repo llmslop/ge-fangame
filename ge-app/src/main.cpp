@@ -1,5 +1,6 @@
 #include "ge-app/scenes/credits_scene.hpp"
 #include "ge-app/scenes/game_scene.hpp"
+#include "ge-app/scenes/gameover_scene.hpp"
 #include "ge-app/scenes/menu_scene.hpp"
 #include "ge-app/scenes/settings_scene.hpp"
 #include "ge-hal/app.hpp"
@@ -9,13 +10,14 @@
 
 namespace ge {
 
-enum class SceneType { Menu, Game, Settings, Credits };
+enum class SceneType { Menu, Game, GameOver, Settings, Credits };
 
 class MainApp : public ge::App {
 public:
   MainApp()
       : ge::App(), menu_scene_impl(*this), game_scene{*this},
-        settings_scene_impl(*this), credits_scene_impl(*this) {
+        gameover_scene{*this}, settings_scene_impl(*this),
+        credits_scene_impl(*this) {
     switch_to_menu();
   }
 
@@ -23,6 +25,23 @@ public:
     App::tick(dt);
     if (current_scene) {
       current_scene->tick(dt);
+    }
+
+    // Check for game over
+    if (current_scene_type == SceneType::Game && game_scene.is_game_over()) {
+      switch_to_gameover();
+    }
+
+    // Check for scene transitions from game over
+    if (current_scene_type == SceneType::GameOver) {
+      if (gameover_scene.wants_restart()) {
+        game_scene.reset();
+        gameover_scene.reset();
+        switch_to_game();
+      } else if (gameover_scene.wants_menu()) {
+        gameover_scene.reset();
+        switch_to_menu();
+      }
     }
   }
 
@@ -58,6 +77,11 @@ public:
   void switch_to_game() {
     current_scene_type = SceneType::Game;
     current_scene = &game_scene;
+  }
+
+  void switch_to_gameover() {
+    current_scene_type = SceneType::GameOver;
+    current_scene = &gameover_scene;
   }
 
   void switch_to_settings() {
@@ -115,6 +139,7 @@ private:
   Scene *current_scene = nullptr;
   MenuSceneImpl menu_scene_impl;
   GameScene game_scene;
+  GameOverScene gameover_scene;
   SettingsSceneImpl settings_scene_impl;
   CreditsSceneImpl credits_scene_impl;
 };
