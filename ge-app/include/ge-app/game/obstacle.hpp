@@ -7,6 +7,10 @@
 #include <vector>
 #include <algorithm>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 namespace ge {
 
 enum class ObstacleType { Wave, Whirlpool, Shark };
@@ -91,21 +95,24 @@ public:
     case ObstacleType::Whirlpool:
       color = 0x001F; // Deep blue
       // Draw whirlpool as a circle with spiral pattern
-      for (i32 dy = -size; dy <= size; dy++) {
-        for (i32 dx = -size; dx <= size; dx++) {
-          float dist = std::sqrt(dx * dx + dy * dy);
-          if (dist <= size) {
-            i32 px = screen_x + dx;
-            i32 py = screen_y + dy;
-            if (px >= 0 && px < (i32)region.get_width() && py >= 0 &&
-                py < (i32)region.get_height()) {
-              // Create spiral effect
-              float angle = std::atan2(dy, dx);
-              float spiral = std::fmod(angle + dist * 0.2f, M_PI / 4);
-              if (spiral < M_PI / 8) {
-                region.set_pixel(px, py, 0x0010); // Darker blue
-              } else {
-                region.set_pixel(px, py, color);
+      {
+        float size_sq_over_4 = (float)(size * size) / 4.0f;
+        for (i32 dy = -size; dy <= size; dy++) {
+          for (i32 dx = -size; dx <= size; dx++) {
+            float dist = std::sqrt(dx * dx + dy * dy);
+            if (dist <= size) {
+              i32 px = screen_x + dx;
+              i32 py = screen_y + dy;
+              if (px >= 0 && px < (i32)region.get_width() && py >= 0 &&
+                  py < (i32)region.get_height()) {
+                // Create spiral effect
+                float angle = std::atan2(dy, dx);
+                float spiral = std::fmod(angle + dist * 0.2f, M_PI / 4);
+                if (spiral < M_PI / 8) {
+                  region.set_pixel(px, py, 0x0010); // Darker blue
+                } else {
+                  region.set_pixel(px, py, color);
+                }
               }
             }
           }

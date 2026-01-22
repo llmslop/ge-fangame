@@ -105,7 +105,6 @@ public:
     boat = Boat();
     // Clear obstacles
     obstacle_manager.clear();
-    last_spawn_time = 0.0f;
     spawn_cooldown = 0.0f;
   }
 
@@ -354,6 +353,5 @@ private:
   // Storm and obstacle system
   ObstacleManager obstacle_manager;
   float spawn_cooldown = 0.0f;
-  float last_spawn_time = 0.0f;
 };
 } // namespace ge
