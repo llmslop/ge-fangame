@@ -93,6 +93,16 @@ public:
   i32 get_x() const { return x.base; }
   i32 get_y() const { return y.base; }
 
+  // HP system
+  float get_hp() const { return hp; }
+  float get_max_hp() const { return max_hp; }
+  void take_damage(float damage) {
+    hp -= damage;
+    if (hp < 0.0f)
+      hp = 0.0f;
+  }
+  bool is_alive() const { return hp > 0.0f; }
+
 private:
   Texture boat{
       default_boat,
@@ -105,5 +115,9 @@ private:
   float angle = default_angle;
 
   Pos<> x = 0, y = 0;
+
+  // HP system
+  static constexpr float max_hp = 100.0f;
+  float hp = max_hp;
 };
 } // namespace ge

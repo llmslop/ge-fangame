@@ -5,11 +5,13 @@
 #include "ge-app/game/clock.hpp"
 #include "ge-app/game/compass.hpp"
 #include "ge-app/game/dock.hpp"
+#include "ge-app/game/obstacle.hpp"
 #include "ge-app/game/sky.hpp"
 #include "ge-app/game/water.hpp"
 #include "ge-app/gfx/color.hpp"
 #include "ge-app/gfx/dialog_box.hpp"
 #include "ge-app/scenes/scene.hpp"
+#include <cstdlib>
 
 namespace ge {
 struct HSV {
@@ -98,6 +100,17 @@ public:
     water.set_water_color(ge::hsv_to_rgb565(142, 255, 181));
   }
 
+  void reset() {
+    // Reset boat position and HP
+    boat = Boat();
+    // Clear obstacles
+    obstacle_manager.clear();
+    last_spawn_time = 0.0f;
+    spawn_cooldown = 0.0f;
+  }
+
+  bool is_game_over() const { return !boat.is_alive(); }
+
   void tick(float dt) override {
     auto current_frame_world_time = clock.get_day_timer().get(app);
     float world_dt = 0.0f;
@@ -110,6 +123,26 @@ public:
       boat.update_angle(joystick.x, joystick.y, world_dt);
     }
     boat.update_position(app, world_dt);
+
+    // Check if storm is active (18:00 - 20:00, i.e., 0.75 - 0.833 of day)
+    float time_of_day = clock.time_in_day(app);
+    bool is_storm = (time_of_day >= 0.75f && time_of_day <= 0.833f);
+
+    if (is_storm) {
+      // Spawn obstacles during storm
+      spawn_cooldown -= world_dt;
+      if (spawn_cooldown <= 0.0f) {
+        spawn_random_obstacle();
+        spawn_cooldown = 2.0f; // Spawn every 2 seconds
+      }
+    }
+
+    // Update obstacles
+    obstacle_manager.update(world_dt, boat.get_x(), boat.get_y(),
+                            ge::App::WIDTH, ge::App::HEIGHT);
+
+    // Check collisions
+    check_collisions();
   }
 
   void render(Surface &fb_region) override {
@@ -121,6 +154,10 @@ public:
     sky.render(fb_region.subsurface(0, 0, ge::App::WIDTH, 80));
     water.render(water_region, app.now() * 1e-3, boat.get_x(), boat.get_y());
     dock.render(app, fb_region, boat.get_x(), boat.get_y());
+
+    // Render obstacles
+    obstacle_manager.render(water_region, boat.get_x(), boat.get_y());
+
     font.render("Hello, World!", -1, fb_region, 10, 10,
                 [](const ge::GlyphContext &g) {
                   uint8_t hue = (uint8_t)(g.x + g.gx);
@@ -149,6 +186,12 @@ public:
       auto mode_indicator_region =
           fb_region.subsurface(PADDING, PADDING + 16, 120, 15);
       mode_indicator.render(mode_indicator_region);
+    }
+    // Render HP bar
+    {
+      static constexpr u32 PADDING = 4;
+      auto hp_region = fb_region.subsurface(PADDING, PADDING + 32, 120, 15);
+      render_hp(hp_region);
     }
     if (current_msg < sizeof(msg) / sizeof(msg[0])) {
       // bottom, padding 4px
@@ -196,6 +239,81 @@ public:
   }
 
 private:
+  void spawn_random_obstacle() {
+    // Random obstacle type
+    int type_rand = std::rand() % 10;
+    ObstacleType type;
+    if (type_rand < 5) {
+      type = ObstacleType::Wave; // 50% waves
+    } else if (type_rand < 8) {
+      type = ObstacleType::Whirlpool; // 30% whirlpools
+    } else {
+      type = ObstacleType::Shark; // 20% sharks
+    }
+
+    // Spawn from ocean (random direction around boat)
+    float angle = (std::rand() % 360) * M_PI / 180.0f;
+    float spawn_distance = 200.0f + (std::rand() % 100);
+
+    float spawn_x = boat.get_x() + spawn_distance * std::cos(angle);
+    float spawn_y = boat.get_y() + spawn_distance * std::sin(angle);
+
+    // Move towards boat (with some randomness)
+    float target_angle = std::atan2(boat.get_y() - spawn_y, boat.get_x() - spawn_x);
+    float speed = 20.0f + (std::rand() % 20); // 20-40 m/s
+    float vx = speed * std::cos(target_angle);
+    float vy = speed * std::sin(target_angle);
+
+    obstacle_manager.spawn_obstacle(spawn_x, spawn_y, vx, vy, type);
+  }
+
+  void check_collisions() {
+    const auto &obstacles = obstacle_manager.get_obstacles();
+    for (const auto &obstacle : obstacles) {
+      if (obstacle.collides_with(boat.get_x(), boat.get_y(), 20.0f)) {
+        boat.take_damage(obstacle.get_damage());
+      }
+    }
+  }
+
+  void render_hp(const Surface &region) {
+    char hp_text[32];
+    snprintf(hp_text, sizeof(hp_text), "HP: %.0f/%.0f", boat.get_hp(),
+             boat.get_max_hp());
+
+    hal::gpu::fill(region, 0x0000);
+
+    // Render HP text
+    Font::regular_font().render_colored(hp_text, -1, region, 1, 1, 0xFFFF);
+
+    // Render HP bar
+    u32 bar_width = 100;
+    u32 bar_height = 8;
+    u32 bar_x = 1;
+    u32 bar_y = 1;
+
+    // Draw HP bar background
+    for (u32 y = bar_y; y < bar_y + bar_height && y < region.get_height();
+         y++) {
+      for (u32 x = bar_x; x < bar_x + bar_width && x < region.get_width();
+           x++) {
+        region.set_pixel(x, y, 0x3186); // Dark gray
+      }
+    }
+
+    // Draw HP bar foreground
+    float hp_ratio = boat.get_hp() / boat.get_max_hp();
+    u32 filled_width = (u32)(bar_width * hp_ratio);
+    u16 hp_color = hp_ratio > 0.5f ? 0x07E0 : (hp_ratio > 0.25f ? 0xFFE0 : 0xF800);
+    for (u32 y = bar_y; y < bar_y + bar_height && y < region.get_height();
+         y++) {
+      for (u32 x = bar_x; x < bar_x + filled_width && x < region.get_width();
+           x++) {
+        region.set_pixel(x, y, hp_color);
+      }
+    }
+  }
+
   // Gameplay objects
   Compass compass;
   Boat boat;
@@ -230,5 +348,10 @@ private:
   const ge::Font &font = ge::Font::bold_font();
 
   i64 last_frame_world_time = -1;
+
+  // Storm and obstacle system
+  ObstacleManager obstacle_manager;
+  float spawn_cooldown = 0.0f;
+  float last_spawn_time = 0.0f;
 };
 } // namespace ge
