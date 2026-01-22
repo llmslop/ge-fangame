@@ -293,6 +293,128 @@ public:
   }
 
 private:
+  void spawn_wave_pattern() {
+    // Choose a random placement pattern
+    int pattern_rand = std::rand() % 100;
+    WavePlacementPattern pattern;
+    
+    if (pattern_rand < 40) {
+      pattern = WavePlacementPattern::Single;
+    } else if (pattern_rand < 70) {
+      pattern = WavePlacementPattern::Barrier;
+    } else if (pattern_rand < 90) {
+      pattern = WavePlacementPattern::Scattered;
+    } else {
+      pattern = WavePlacementPattern::Convergent;
+    }
+    
+    switch (pattern) {
+    case WavePlacementPattern::Single:
+      spawn_single_wave();
+      break;
+    case WavePlacementPattern::Barrier:
+      spawn_wave_barrier();
+      break;
+    case WavePlacementPattern::Scattered:
+      spawn_scattered_waves();
+      break;
+    case WavePlacementPattern::Convergent:
+      spawn_convergent_waves();
+      break;
+    }
+  }
+  
+  void spawn_single_wave() {
+    // Single wave coming from random direction
+    float angle = (std::rand() % 360) * M_PI / 180.0f;
+    float spawn_distance = 200.0f + (std::rand() % 100);
+    
+    float spawn_x = boat.get_x() + spawn_distance * std::cos(angle);
+    float spawn_y = boat.get_y() + spawn_distance * std::sin(angle);
+    
+    // Move towards boat
+    float target_angle = std::atan2(boat.get_y() - spawn_y, boat.get_x() - spawn_x);
+    float speed = 25.0f + (std::rand() % 15);
+    float vx = speed * std::cos(target_angle);
+    float vy = speed * std::sin(target_angle);
+    
+    obstacle_manager.spawn_obstacle(spawn_x, spawn_y, vx, vy, ObstacleType::Wave);
+  }
+  
+  void spawn_wave_barrier() {
+    // Line of waves with gaps - creates a barrier the player must navigate
+    float angle = (std::rand() % 360) * M_PI / 180.0f;
+    float spawn_distance = 250.0f;
+    
+    // Perpendicular direction for the barrier line
+    float perp_angle = angle + M_PI / 2;
+    
+    // Spawn 5-7 waves in a line with gaps
+    int num_waves = 5 + (std::rand() % 3);
+    float spacing = 50.0f; // Space between waves
+    float gap_chance = 0.3f; // 30% chance of gap
+    
+    for (int i = 0; i < num_waves; i++) {
+      // Skip some waves to create gaps
+      if ((std::rand() % 100) < (gap_chance * 100)) {
+        continue;
+      }
+      
+      float offset = (i - num_waves / 2.0f) * spacing;
+      float spawn_x = boat.get_x() + spawn_distance * std::cos(angle) + 
+                     offset * std::cos(perp_angle);
+      float spawn_y = boat.get_y() + spawn_distance * std::sin(angle) + 
+                     offset * std::sin(perp_angle);
+      
+      // All waves move in same direction (perpendicular to barrier)
+      float speed = 20.0f + (std::rand() % 10);
+      float vx = speed * std::cos(angle);
+      float vy = speed * std::sin(angle);
+      
+      obstacle_manager.spawn_obstacle(spawn_x, spawn_y, vx, vy, ObstacleType::Wave);
+    }
+  }
+  
+  void spawn_scattered_waves() {
+    // Multiple waves from random directions
+    int num_waves = 3 + (std::rand() % 3); // 3-5 waves
+    
+    for (int i = 0; i < num_waves; i++) {
+      float angle = (std::rand() % 360) * M_PI / 180.0f;
+      float spawn_distance = 180.0f + (std::rand() % 120);
+      
+      float spawn_x = boat.get_x() + spawn_distance * std::cos(angle);
+      float spawn_y = boat.get_y() + spawn_distance * std::sin(angle);
+      
+      float target_angle = std::atan2(boat.get_y() - spawn_y, boat.get_x() - spawn_x);
+      float speed = 22.0f + (std::rand() % 12);
+      float vx = speed * std::cos(target_angle);
+      float vy = speed * std::sin(target_angle);
+      
+      obstacle_manager.spawn_obstacle(spawn_x, spawn_y, vx, vy, ObstacleType::Wave);
+    }
+  }
+  
+  void spawn_convergent_waves() {
+    // Waves from multiple directions converging on player
+    int num_directions = 3 + (std::rand() % 2); // 3-4 directions
+    
+    for (int i = 0; i < num_directions; i++) {
+      float angle = (i * 2 * M_PI / num_directions) + (std::rand() % 60 - 30) * M_PI / 180.0f;
+      float spawn_distance = 220.0f;
+      
+      float spawn_x = boat.get_x() + spawn_distance * std::cos(angle);
+      float spawn_y = boat.get_y() + spawn_distance * std::sin(angle);
+      
+      float target_angle = std::atan2(boat.get_y() - spawn_y, boat.get_x() - spawn_x);
+      float speed = 23.0f + (std::rand() % 10);
+      float vx = speed * std::cos(target_angle);
+      float vy = speed * std::sin(target_angle);
+      
+      obstacle_manager.spawn_obstacle(spawn_x, spawn_y, vx, vy, ObstacleType::Wave);
+    }
+  }
+
   void spawn_random_obstacle() {
     // Random obstacle type
     int type_rand = std::rand() % 10;
@@ -306,41 +428,8 @@ private:
     }
 
     if (type == ObstacleType::Wave) {
-      // Waves spawn from ocean edge and move with patterns
-      float angle = (std::rand() % 360) * M_PI / 180.0f;
-      float spawn_distance = 200.0f + (std::rand() % 100);
-
-      float spawn_x = boat.get_x() + spawn_distance * std::cos(angle);
-      float spawn_y = boat.get_y() + spawn_distance * std::sin(angle);
-
-      // Move towards boat
-      float target_angle =
-          std::atan2(boat.get_y() - spawn_y, boat.get_x() - spawn_x);
-      float speed = 20.0f + (std::rand() % 20); // 20-40 m/s
-      float vx = speed * std::cos(target_angle);
-      float vy = speed * std::sin(target_angle);
-
-      // Random wave pattern
-      WavePattern pattern;
-      int pattern_rand = std::rand() % 4;
-      switch (pattern_rand) {
-      case 0:
-        pattern = WavePattern::Straight;
-        break;
-      case 1:
-        pattern = WavePattern::Sine;
-        break;
-      case 2:
-        pattern = WavePattern::Zigzag;
-        break;
-      case 3:
-        pattern = WavePattern::Circular;
-        break;
-      default:
-        pattern = WavePattern::Straight;
-      }
-
-      obstacle_manager.spawn_obstacle(spawn_x, spawn_y, vx, vy, type, pattern);
+      // Spawn wave pattern instead of single wave
+      spawn_wave_pattern();
     } else {
       // Whirlpools and sharks appear randomly near the boat and stay in place
       float angle = (std::rand() % 360) * M_PI / 180.0f;
@@ -350,8 +439,7 @@ private:
       float spawn_y = boat.get_y() + spawn_distance * std::sin(angle);
 
       // No velocity - they don't move
-      obstacle_manager.spawn_obstacle(spawn_x, spawn_y, 0.0f, 0.0f, type,
-                                      WavePattern::Straight);
+      obstacle_manager.spawn_obstacle(spawn_x, spawn_y, 0.0f, 0.0f, type);
     }
   }
 

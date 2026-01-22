@@ -15,103 +15,57 @@ namespace ge {
 
 enum class ObstacleType { Wave, Whirlpool, Shark };
 
-// Wave movement patterns
-enum class WavePattern {
-  Straight,    // Move in straight line
-  Sine,        // Sine wave pattern
-  Zigzag,      // Zigzag pattern
-  Circular     // Circular motion
+// Wave placement patterns (not movement patterns)
+enum class WavePlacementPattern {
+  Single,      // Single wave
+  Barrier,     // Line of waves with gaps
+  Scattered,   // Random scattered waves
+  Convergent   // Waves converging from multiple directions
 };
 
 class Obstacle {
 public:
   Obstacle(float x, float y, float vx, float vy, ObstacleType type,
-           float damage, WavePattern pattern = WavePattern::Straight)
+           float damage)
       : x(x), y(y), vx(vx), vy(vy), type(type), initial_damage(damage),
-        current_damage(damage), pattern(pattern), lifetime(0.0f),
-        has_damaged(false) {
-    // For stationary obstacles (whirlpool, shark), set max lifetime
+        current_damage(0.0f), lifetime(0.0f), has_damaged(false) {
+    // Set growth time and max lifetime based on type
     if (type == ObstacleType::Whirlpool) {
-      max_lifetime = 8.0f; // 8 seconds to fade
+      growth_time = 2.0f;    // 2 seconds to grow
+      max_lifetime = 10.0f;  // 10 seconds total (2s grow + 8s active)
     } else if (type == ObstacleType::Shark) {
-      max_lifetime = 6.0f; // 6 seconds to fade
+      growth_time = 1.5f;    // 1.5 seconds warning
+      max_lifetime = 7.5f;   // 7.5 seconds total (1.5s warn + 6s active)
     } else {
-      max_lifetime = 20.0f; // Waves last longer
+      growth_time = 0.5f;    // 0.5 seconds to grow
+      max_lifetime = 20.5f;  // 20.5 seconds total
     }
     
-    // Store initial position for pattern calculations
     initial_x = x;
     initial_y = y;
-    pattern_time = 0.0f;
   }
 
   void update(float dt) {
     lifetime += dt;
     
-    // Update damage based on lifetime (weakening over time)
-    float strength_ratio = 1.0f - (lifetime / max_lifetime);
-    if (strength_ratio < 0.0f) strength_ratio = 0.0f;
-    current_damage = initial_damage * strength_ratio;
-    
-    if (type == ObstacleType::Wave) {
-      // Waves move with patterns
-      pattern_time += dt;
-      
-      switch (pattern) {
-      case WavePattern::Straight:
-        x += vx * dt;
-        y += vy * dt;
-        break;
-        
-      case WavePattern::Sine:
-      case WavePattern::Zigzag:
-        // Move forward and oscillate perpendicular
-        x += vx * dt;
-        y += vy * dt;
-        // Calculate perpendicular direction (optimize - do once)
-        {
-          float speed = std::sqrt(vx * vx + vy * vy);
-          if (speed > 0.0f) {
-            float perp_x = -vy / speed;
-            float perp_y = vx / speed;
-            
-            if (pattern == WavePattern::Sine) {
-              float oscillation = std::sin(pattern_time * 3.0f) * 15.0f;
-              x += perp_x * oscillation * dt;
-              y += perp_y * oscillation * dt;
-            } else {
-              float zigzag = (int(pattern_time * 2.0f) % 2 == 0) ? 10.0f : -10.0f;
-              x += perp_x * zigzag * dt;
-              y += perp_y * zigzag * dt;
-            }
-          }
-        }
-        break;
-        
-      case WavePattern::Circular:
-        // Circular/spiral motion
-        {
-          float base_speed = std::sqrt(vx * vx + vy * vy);
-          float radius = 30.0f;
-          float angular_speed = base_speed / radius;
-          
-          float center_vx = vx;
-          float center_vy = vy;
-          x += center_vx * dt;
-          y += center_vy * dt;
-          
-          // Add circular component - use stored previous position
-          float new_angle = pattern_time * angular_speed;
-          float prev_angle = (pattern_time - dt) * angular_speed;
-          float circle_x = std::cos(new_angle) * radius;
-          float circle_y = std::sin(new_angle) * radius;
-          x += circle_x - std::cos(prev_angle) * radius;
-          y += circle_y - std::sin(prev_angle) * radius;
-        }
-        break;
-      }
+    // Growth phase - obstacle grows to full strength
+    if (lifetime < growth_time) {
+      float growth_ratio = lifetime / growth_time;
+      current_damage = initial_damage * growth_ratio;
+    } else {
+      // Active phase - full strength, then weakening
+      float active_time = lifetime - growth_time;
+      float max_active_time = max_lifetime - growth_time;
+      float strength_ratio = 1.0f - (active_time / max_active_time);
+      if (strength_ratio < 0.0f) strength_ratio = 0.0f;
+      current_damage = initial_damage * strength_ratio;
     }
-    // Whirlpools and sharks don't move - they stay in place and fade
+    
+    // Only waves move - sharks and whirlpools are stationary
+    if (type == ObstacleType::Wave) {
+      x += vx * dt;
+      y += vy * dt;
+    }
   }
 
   float get_x() const { return x; }
@@ -119,7 +73,10 @@ public:
   ObstacleType get_type() const { return type; }
   float get_damage() const { return current_damage; }
   
-  bool can_damage() const { return !has_damaged && current_damage > 0.0f; }
+  bool can_damage() const { 
+    // Can only damage after growth phase
+    return !has_damaged && lifetime >= growth_time && current_damage > 0.0f; 
+  }
   
   void mark_damaged() { has_damaged = true; }
   
@@ -127,10 +84,28 @@ public:
     return lifetime >= max_lifetime || current_damage <= 0.0f;
   }
   
+  float get_growth_ratio() const {
+    if (lifetime < growth_time) {
+      return lifetime / growth_time;
+    }
+    return 1.0f;
+  }
+  
   float get_alpha() const {
-    // Fade out as lifetime approaches max
-    float alpha = 1.0f - (lifetime / max_lifetime);
+    // During growth phase, fade in
+    if (lifetime < growth_time) {
+      return lifetime / growth_time;
+    }
+    // After growth, fade out based on remaining lifetime
+    float active_time = lifetime - growth_time;
+    float max_active_time = max_lifetime - growth_time;
+    float alpha = 1.0f - (active_time / max_active_time);
     return alpha > 0.0f ? alpha : 0.0f;
+  }
+  
+  bool is_warning_phase() const {
+    // Warning phase is during growth
+    return lifetime < growth_time;
   }
 
   // Simple collision detection - check if point (px, py) is within radius
@@ -143,15 +118,23 @@ public:
   }
 
   float get_radius() const {
+    float base_radius;
     switch (type) {
     case ObstacleType::Wave:
-      return 20.0f;
+      base_radius = 20.0f;
+      break;
     case ObstacleType::Whirlpool:
-      return 25.0f;
+      base_radius = 25.0f;
+      break;
     case ObstacleType::Shark:
-      return 15.0f;
+      base_radius = 15.0f;
+      break;
+    default:
+      base_radius = 20.0f;
     }
-    return 20.0f;
+    
+    // Scale by growth ratio
+    return base_radius * get_growth_ratio();
   }
 
   // Check if obstacle is far off-screen and should be removed
@@ -178,26 +161,28 @@ public:
       return;
     }
     
+    float growth = get_growth_ratio();
     float alpha = get_alpha();
     if (alpha <= 0.0f) return;
+    
+    bool warning = is_warning_phase();
 
     // Render based on type
     u16 color;
-    i32 size = (i32)get_radius();
+    i32 size = (i32)(get_radius());
+    if (size < 3) size = 3;
 
     switch (type) {
     case ObstacleType::Wave:
       color = 0xFFFF; // White
       // Apply alpha blending for fading
       if (alpha < 1.0f) {
-        // Approximate alpha by making color lighter
         u8 blend = (u8)(255 * alpha);
-        color = ge::blend_rgb565(0x18E3, 0xFFFF, blend); // Blend with water color
+        color = ge::blend_rgb565(0x18E3, 0xFFFF, blend);
       }
-      // Draw wave as a horizontal ellipse
+      // Draw wave as a horizontal ellipse (scaled by growth)
       for (i32 dy = -size / 2; dy <= size / 2; dy++) {
-        i32 width =
-            (i32)(size * 1.5f *
+        i32 width = (i32)(size * 1.5f * growth *
                   std::sqrt(1.0f - (dy * dy) / (float)(size * size / 4)));
         for (i32 dx = -width; dx <= width; dx++) {
           i32 px = screen_x + dx;
@@ -211,13 +196,31 @@ public:
       break;
 
     case ObstacleType::Whirlpool:
-      color = 0x001F; // Deep blue
-      // Apply alpha - scale size based on alpha
-      size = (i32)(size * alpha);
-      if (size < 5) size = 5;
-      
-      // Draw whirlpool as a circle with spiral pattern
-      {
+      // During warning phase, show pulsing circle indicator
+      if (warning) {
+        // Pulsing warning indicator
+        float pulse = 0.5f + 0.5f * std::sin(lifetime * 8.0f);
+        u16 warn_color = ge::blend_rgb565(0x001F, 0x07FF, (u8)(pulse * 255));
+        i32 warn_size = (i32)(size * (0.5f + 0.5f * growth));
+        
+        // Draw pulsing circle
+        for (i32 dy = -warn_size; dy <= warn_size; dy++) {
+          for (i32 dx = -warn_size; dx <= warn_size; dx++) {
+            float dist = std::sqrt(dx * dx + dy * dy);
+            if (dist <= warn_size && dist >= warn_size - 3) {
+              i32 px = screen_x + dx;
+              i32 py = screen_y + dy;
+              if (px >= 0 && px < (i32)region.get_width() && py >= 0 &&
+                  py < (i32)region.get_height()) {
+                region.set_pixel(px, py, warn_color);
+              }
+            }
+          }
+        }
+      } else {
+        // Full whirlpool with spiral
+        color = 0x001F; // Deep blue
+        
         for (i32 dy = -size; dy <= size; dy++) {
           for (i32 dx = -size; dx <= size; dx++) {
             float dist = std::sqrt(dx * dx + dy * dy);
@@ -231,7 +234,7 @@ public:
                 float spiral = std::fmod(angle + dist * 0.2f + lifetime * 2.0f, M_PI / 4);
                 u16 pixel_color;
                 if (spiral < M_PI / 8) {
-                  pixel_color = u16{0x0010}; // Darker blue
+                  pixel_color = u16{0x0010};
                 } else {
                   pixel_color = color;
                 }
@@ -249,39 +252,61 @@ public:
       break;
 
     case ObstacleType::Shark:
-      color = 0x7800; // Gray
-      // Apply alpha - make smaller and fade
-      size = (i32)(size * alpha);
-      if (size < 5) size = 5;
-      
-      // Blend color for fading
-      if (alpha < 1.0f) {
-        u8 blend = (u8)(255 * alpha);
-        color = ge::blend_rgb565(0x18E3, color, blend);
-      }
-      
-      // Draw shark as a triangle
-      for (i32 dy = -size; dy <= size; dy++) {
-        i32 width = size - std::abs(dy);
-        for (i32 dx = -width; dx <= width; dx++) {
-          i32 px = screen_x + dx;
-          i32 py = screen_y + dy;
-          if (px >= 0 && px < (i32)region.get_width() && py >= 0 &&
-              py < (i32)region.get_height()) {
-            region.set_pixel(px, py, color);
+      // During warning phase, show fin circling indicator
+      if (warning) {
+        // Circling fin warning
+        float circle_angle = lifetime * 4.0f; // Circle 4 times during warning
+        i32 circle_radius = size + 10;
+        i32 fin_x = screen_x + (i32)(std::cos(circle_angle) * circle_radius);
+        i32 fin_y = screen_y + (i32)(std::sin(circle_angle) * circle_radius);
+        
+        // Draw small warning fin
+        u16 warn_color = 0xF800; // Red warning
+        i32 fin_size = (i32)(5 * growth);
+        for (i32 dy = -fin_size; dy <= 0; dy++) {
+          i32 width = fin_size + dy;
+          for (i32 dx = -width; dx <= width; dx++) {
+            i32 px = fin_x + dx;
+            i32 py = fin_y + dy;
+            if (px >= 0 && px < (i32)region.get_width() && py >= 0 &&
+                py < (i32)region.get_height()) {
+              region.set_pixel(px, py, warn_color);
+            }
           }
         }
-      }
-      // Draw fin (small triangle on top) - only if alpha is high enough
-      if (alpha > 0.3f) {
-        for (i32 dy = -size - 5; dy <= -size; dy++) {
-          i32 width = (-size - dy) / 2;
+      } else {
+        // Full shark bite
+        color = 0x7800; // Gray
+        
+        // Blend color for fading
+        if (alpha < 1.0f) {
+          u8 blend = (u8)(255 * alpha);
+          color = ge::blend_rgb565(0x18E3, color, blend);
+        }
+        
+        // Draw shark as a triangle
+        for (i32 dy = -size; dy <= size; dy++) {
+          i32 width = size - std::abs(dy);
           for (i32 dx = -width; dx <= width; dx++) {
             i32 px = screen_x + dx;
             i32 py = screen_y + dy;
             if (px >= 0 && px < (i32)region.get_width() && py >= 0 &&
                 py < (i32)region.get_height()) {
               region.set_pixel(px, py, color);
+            }
+          }
+        }
+        // Draw fin
+        if (alpha > 0.3f) {
+          for (i32 dy = -size - 5; dy <= -size; dy++) {
+            i32 width = (-size - dy) / 2;
+            for (i32 dx = -width; dx <= width; dx++) {
+              i32 px = screen_x + dx;
+              i32 py = screen_y + dy;
+              if (px >= 0 && px < (i32)region.get_width() && py >= 0 &&
+                  py < (i32)region.get_height()) {
+                region.set_pixel(px, py, color);
+              }
             }
           }
         }
@@ -295,13 +320,12 @@ private:
   float vx, vy; // Velocity (only used for waves)
   ObstacleType type;
   float initial_damage;
-  float current_damage;  // Weakens over time
-  WavePattern pattern;
+  float current_damage;  // Grows then weakens over time
   float lifetime;
+  float growth_time;     // Time to reach full size
   float max_lifetime;
-  float initial_x, initial_y;  // For pattern calculations
-  float pattern_time;
-  bool has_damaged;  // Track if this obstacle has already damaged the boat
+  float initial_x, initial_y;
+  bool has_damaged;
 };
 
 class ObstacleManager {
@@ -325,8 +349,7 @@ public:
         obstacles.end());
   }
 
-  void spawn_obstacle(float x, float y, float vx, float vy, ObstacleType type,
-                      WavePattern pattern = WavePattern::Straight) {
+  void spawn_obstacle(float x, float y, float vx, float vy, ObstacleType type) {
     float damage;
     switch (type) {
     case ObstacleType::Wave:
@@ -339,7 +362,7 @@ public:
       damage = 90.0f; // Almost instant kill
       break;
     }
-    obstacles.emplace_back(x, y, vx, vy, type, damage, pattern);
+    obstacles.emplace_back(x, y, vx, vy, type, damage);
   }
 
   void render(Surface &region, i32 boat_x, i32 boat_y) const {
