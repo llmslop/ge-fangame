@@ -137,9 +137,10 @@ public:
       boat.update_position(app, world_dt);
     }
 
-    // Check if storm is active (18:00 - 20:00, i.e., 0.75 - 0.833 of day)
+    // Check if storm is active (13:00 - 18:00, i.e., 0.542 - 0.75 of day)
+    // 1PM = 13/24 = 0.542, 6PM = 18/24 = 0.75
     float time_of_day = clock.time_in_day(app);
-    bool is_storm = (time_of_day >= 0.75f && time_of_day <= 0.833f);
+    bool is_storm = (time_of_day >= 0.542f && time_of_day <= 0.75f);
 
     if (is_storm) {
       // Spawn obstacles during storm
@@ -304,33 +305,65 @@ private:
       type = ObstacleType::Shark; // 20% sharks
     }
 
-    // Spawn from ocean (random direction around boat)
-    float angle = (std::rand() % 360) * M_PI / 180.0f;
-    float spawn_distance = 200.0f + (std::rand() % 100);
+    if (type == ObstacleType::Wave) {
+      // Waves spawn from ocean edge and move with patterns
+      float angle = (std::rand() % 360) * M_PI / 180.0f;
+      float spawn_distance = 200.0f + (std::rand() % 100);
 
-    float spawn_x = boat.get_x() + spawn_distance * std::cos(angle);
-    float spawn_y = boat.get_y() + spawn_distance * std::sin(angle);
+      float spawn_x = boat.get_x() + spawn_distance * std::cos(angle);
+      float spawn_y = boat.get_y() + spawn_distance * std::sin(angle);
 
-    // Move towards boat (with some randomness)
-    float target_angle =
-        std::atan2(boat.get_y() - spawn_y, boat.get_x() - spawn_x);
-    float speed = 20.0f + (std::rand() % 20); // 20-40 m/s
-    float vx = speed * std::cos(target_angle);
-    float vy = speed * std::sin(target_angle);
+      // Move towards boat
+      float target_angle =
+          std::atan2(boat.get_y() - spawn_y, boat.get_x() - spawn_x);
+      float speed = 20.0f + (std::rand() % 20); // 20-40 m/s
+      float vx = speed * std::cos(target_angle);
+      float vy = speed * std::sin(target_angle);
 
-    obstacle_manager.spawn_obstacle(spawn_x, spawn_y, vx, vy, type);
+      // Random wave pattern
+      WavePattern pattern;
+      int pattern_rand = std::rand() % 4;
+      switch (pattern_rand) {
+      case 0:
+        pattern = WavePattern::Straight;
+        break;
+      case 1:
+        pattern = WavePattern::Sine;
+        break;
+      case 2:
+        pattern = WavePattern::Zigzag;
+        break;
+      case 3:
+        pattern = WavePattern::Circular;
+        break;
+      default:
+        pattern = WavePattern::Straight;
+      }
+
+      obstacle_manager.spawn_obstacle(spawn_x, spawn_y, vx, vy, type, pattern);
+    } else {
+      // Whirlpools and sharks appear randomly near the boat and stay in place
+      float angle = (std::rand() % 360) * M_PI / 180.0f;
+      float spawn_distance = 50.0f + (std::rand() % 150); // Closer than waves
+
+      float spawn_x = boat.get_x() + spawn_distance * std::cos(angle);
+      float spawn_y = boat.get_y() + spawn_distance * std::sin(angle);
+
+      // No velocity - they don't move
+      obstacle_manager.spawn_obstacle(spawn_x, spawn_y, 0.0f, 0.0f, type,
+                                      WavePattern::Straight);
+    }
   }
 
   void check_collisions() {
     auto &obstacles_vec = obstacle_manager.get_obstacles();
 
-    // Check collision and mark for removal
-    for (auto it = obstacles_vec.begin(); it != obstacles_vec.end();) {
-      if (it->collides_with(boat.get_x(), boat.get_y(), 20.0f)) {
-        boat.take_damage(it->get_damage());
-        it = obstacles_vec.erase(it); // Remove obstacle after collision
-      } else {
-        ++it;
+    // Check collision - obstacles only damage once then fade naturally
+    for (auto &obstacle : obstacles_vec) {
+      if (obstacle.can_damage() && 
+          obstacle.collides_with(boat.get_x(), boat.get_y(), 20.0f)) {
+        boat.take_damage(obstacle.get_damage());
+        obstacle.mark_damaged();
       }
     }
   }
