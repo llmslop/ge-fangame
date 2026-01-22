@@ -64,29 +64,27 @@ public:
         break;
         
       case WavePattern::Sine:
+      case WavePattern::Zigzag:
         // Move forward and oscillate perpendicular
         x += vx * dt;
         y += vy * dt;
-        // Add sine wave perpendicular to direction
+        // Calculate perpendicular direction (optimize - do once)
         {
-          float perp_x = -vy / std::sqrt(vx * vx + vy * vy);
-          float perp_y = vx / std::sqrt(vx * vx + vy * vy);
-          float oscillation = std::sin(pattern_time * 3.0f) * 15.0f;
-          x += perp_x * oscillation * dt;
-          y += perp_y * oscillation * dt;
-        }
-        break;
-        
-      case WavePattern::Zigzag:
-        // Zigzag pattern
-        x += vx * dt;
-        y += vy * dt;
-        {
-          float perp_x = -vy / std::sqrt(vx * vx + vy * vy);
-          float perp_y = vx / std::sqrt(vx * vx + vy * vy);
-          float zigzag = (int(pattern_time * 2.0f) % 2 == 0) ? 10.0f : -10.0f;
-          x += perp_x * zigzag * dt;
-          y += perp_y * zigzag * dt;
+          float speed = std::sqrt(vx * vx + vy * vy);
+          if (speed > 0.0f) {
+            float perp_x = -vy / speed;
+            float perp_y = vx / speed;
+            
+            if (pattern == WavePattern::Sine) {
+              float oscillation = std::sin(pattern_time * 3.0f) * 15.0f;
+              x += perp_x * oscillation * dt;
+              y += perp_y * oscillation * dt;
+            } else {
+              float zigzag = (int(pattern_time * 2.0f) % 2 == 0) ? 10.0f : -10.0f;
+              x += perp_x * zigzag * dt;
+              y += perp_y * zigzag * dt;
+            }
+          }
         }
         break;
         
@@ -96,18 +94,19 @@ public:
           float base_speed = std::sqrt(vx * vx + vy * vy);
           float radius = 30.0f;
           float angular_speed = base_speed / radius;
-          pattern_time += dt;
           
           float center_vx = vx;
           float center_vy = vy;
           x += center_vx * dt;
           y += center_vy * dt;
           
-          // Add circular component
-          float circle_x = std::cos(pattern_time * angular_speed) * radius;
-          float circle_y = std::sin(pattern_time * angular_speed) * radius;
-          x += (circle_x - std::cos((pattern_time - dt) * angular_speed) * radius);
-          y += (circle_y - std::sin((pattern_time - dt) * angular_speed) * radius);
+          // Add circular component - use stored previous position
+          float new_angle = pattern_time * angular_speed;
+          float prev_angle = (pattern_time - dt) * angular_speed;
+          float circle_x = std::cos(new_angle) * radius;
+          float circle_y = std::sin(new_angle) * radius;
+          x += circle_x - std::cos(prev_angle) * radius;
+          y += circle_y - std::sin(prev_angle) * radius;
         }
         break;
       }
