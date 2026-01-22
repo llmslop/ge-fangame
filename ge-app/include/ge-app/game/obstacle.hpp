@@ -1,11 +1,11 @@
 #pragma once
 
+#include "ge-app/gfx/color.hpp"
 #include "ge-hal/app.hpp"
 #include "ge-hal/surface.hpp"
-#include "ge-app/gfx/color.hpp"
+#include <algorithm>
 #include <cmath>
 #include <vector>
-#include <algorithm>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -17,7 +17,8 @@ enum class ObstacleType { Wave, Whirlpool, Shark };
 
 class Obstacle {
 public:
-  Obstacle(float x, float y, float vx, float vy, ObstacleType type, float damage)
+  Obstacle(float x, float y, float vx, float vy, ObstacleType type,
+           float damage)
       : x(x), y(y), vx(vx), vy(vy), type(type), damage(damage) {}
 
   void update(float dt) {
@@ -80,7 +81,9 @@ public:
       color = 0xFFFF; // White
       // Draw wave as a horizontal ellipse
       for (i32 dy = -size / 2; dy <= size / 2; dy++) {
-        i32 width = (i32)(size * 1.5f * std::sqrt(1.0f - (dy * dy) / (float)(size * size / 4)));
+        i32 width =
+            (i32)(size * 1.5f *
+                  std::sqrt(1.0f - (dy * dy) / (float)(size * size / 4)));
         for (i32 dx = -width; dx <= width; dx++) {
           i32 px = screen_x + dx;
           i32 py = screen_y + dy;
@@ -109,7 +112,7 @@ public:
                 float angle = std::atan2(dy, dx);
                 float spiral = std::fmod(angle + dist * 0.2f, M_PI / 4);
                 if (spiral < M_PI / 8) {
-                  region.set_pixel(px, py, 0x0010); // Darker blue
+                  region.set_pixel(px, py, u16{0x0010}); // Darker blue
                 } else {
                   region.set_pixel(px, py, color);
                 }
@@ -151,8 +154,8 @@ public:
   }
 
 private:
-  float x, y;      // World position
-  float vx, vy;    // Velocity
+  float x, y;   // World position
+  float vx, vy; // Velocity
   ObstacleType type;
   float damage;
 };
@@ -167,14 +170,14 @@ public:
     }
 
     // Remove off-screen obstacles
-    obstacles.erase(
-        std::remove_if(obstacles.begin(), obstacles.end(),
-                       [boat_x, boat_y, screen_width, screen_height](
-                           const Obstacle &obs) {
-                         return obs.is_off_screen(boat_x, boat_y, screen_width,
-                                                   screen_height);
-                       }),
-        obstacles.end());
+    obstacles.erase(std::remove_if(obstacles.begin(), obstacles.end(),
+                                   [boat_x, boat_y, screen_width,
+                                    screen_height](const Obstacle &obs) {
+                                     return obs.is_off_screen(boat_x, boat_y,
+                                                              screen_width,
+                                                              screen_height);
+                                   }),
+                    obstacles.end());
   }
 
   void spawn_obstacle(float x, float y, float vx, float vy, ObstacleType type) {

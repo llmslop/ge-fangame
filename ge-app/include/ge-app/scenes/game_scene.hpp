@@ -5,8 +5,8 @@
 #include "ge-app/game/clock.hpp"
 #include "ge-app/game/compass.hpp"
 #include "ge-app/game/dock.hpp"
-#include "ge-app/game/obstacle.hpp"
 #include "ge-app/game/fishing.hpp"
+#include "ge-app/game/obstacle.hpp"
 #include "ge-app/game/sky.hpp"
 #include "ge-app/game/water.hpp"
 #include "ge-app/gfx/color.hpp"
@@ -312,7 +312,8 @@ private:
     float spawn_y = boat.get_y() + spawn_distance * std::sin(angle);
 
     // Move towards boat (with some randomness)
-    float target_angle = std::atan2(boat.get_y() - spawn_y, boat.get_x() - spawn_x);
+    float target_angle =
+        std::atan2(boat.get_y() - spawn_y, boat.get_x() - spawn_x);
     float speed = 20.0f + (std::rand() % 20); // 20-40 m/s
     float vx = speed * std::cos(target_angle);
     float vy = speed * std::sin(target_angle);
@@ -322,7 +323,7 @@ private:
 
   void check_collisions() {
     auto &obstacles_vec = obstacle_manager.get_obstacles();
-    
+
     // Check collision and mark for removal
     for (auto it = obstacles_vec.begin(); it != obstacles_vec.end();) {
       if (it->collides_with(boat.get_x(), boat.get_y(), 20.0f)) {
@@ -334,7 +335,7 @@ private:
     }
   }
 
-  void render_hp(const Surface &region) {
+  void render_hp(Surface &region) {
     char hp_text[32];
     snprintf(hp_text, sizeof(hp_text), "HP: %.0f/%.0f", boat.get_hp(),
              boat.get_max_hp());
@@ -352,14 +353,15 @@ private:
          y++) {
       for (u32 x = bar_x; x < bar_x + bar_width && x < region.get_width();
            x++) {
-        region.set_pixel(x, y, 0x3186); // Dark gray
+        region.set_pixel(x, y, u16{0x3186}); // Dark gray
       }
     }
 
     // Draw HP bar foreground
     float hp_ratio = boat.get_hp() / boat.get_max_hp();
     u32 filled_width = (u32)(bar_width * hp_ratio);
-    u16 hp_color = hp_ratio > 0.5f ? 0x07E0 : (hp_ratio > 0.25f ? 0xFFE0 : 0xF800);
+    u16 hp_color =
+        hp_ratio > 0.5f ? 0x07E0 : (hp_ratio > 0.25f ? 0xFFE0 : 0xF800);
     for (u32 y = bar_y; y < bar_y + bar_height && y < region.get_height();
          y++) {
       for (u32 x = bar_x; x < bar_x + filled_width && x < region.get_width();
