@@ -104,6 +104,7 @@
               ruff-format.enable = true;
             };
           };
-        });
+        }
+      );
     };
 }

@@ -65,8 +65,8 @@ jobs:
         run: |
           nix develop --command bash -c '
             # Find all C++ source files
-            find ge-app ge-hal -name "*.cpp" -o -name "*.hpp" | \
-            xargs -I {} clang-tidy -p build {}
+            find ge-app ge-hal \( -name "*.cpp" -o -name "*.hpp" \) | \
+            xargs -r -I {} clang-tidy -p build {}
           '
 
   build-host:
