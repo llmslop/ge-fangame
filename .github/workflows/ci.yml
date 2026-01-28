@@ -154,7 +154,7 @@ jobs:
             # Check for any warnings or errors
             if grep -i "warning:" clang-tidy-pc.log || grep -i "error:" clang-tidy-pc.log; then
               echo "clang-tidy found issues (warnings/errors logged)"
-              exit 0  # Don'\''t fail the build on warnings for now
+              exit 1
             else
               echo "clang-tidy passed with no issues"
             fi
