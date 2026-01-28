@@ -79,23 +79,31 @@
         }
       );
 
-      checks = forEachSystem (system: {
-        pre-commit-check = git-hooks.lib.${system}.run {
-          src = ./.;
-          hooks = {
-            nixfmt.enable = true;
-            statix.enable = true;
-            check-yaml.enable = true;
-            end-of-file-fixer = {
-              enable = true;
-              excludes = [ ".*\\.bin" ];
+      checks = forEachSystem (system: 
+        let
+          pkgs = import nixpkgs { inherit system; };
+        in
+        {
+          pre-commit-check = git-hooks.lib.${system}.run {
+            src = ./.;
+            hooks = {
+              nixfmt.enable = true;
+              statix.enable = true;
+              check-yaml.enable = true;
+              end-of-file-fixer = {
+                enable = true;
+                excludes = [ ".*\\.bin" ];
+              };
+              clang-format.enable = true;
+              clang-tidy = {
+                enable = true;
+                package = pkgs.clang-tools;
+              };
+              trim-trailing-whitespace.enable = true;
+              ruff.enable = true;
+              ruff-format.enable = true;
             };
-            clang-format.enable = true;
-            trim-trailing-whitespace.enable = true;
-            ruff.enable = true;
-            ruff-format.enable = true;
           };
-        };
-      });
+        });
     };
 }
