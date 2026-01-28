@@ -119,6 +119,8 @@ jobs:
   clang-tidy-pc:
     name: clang-tidy for PC Backend
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -169,6 +171,8 @@ jobs:
   clang-tidy-stm32:
     name: clang-tidy for STM32 Backend
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
