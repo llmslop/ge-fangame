@@ -141,6 +141,8 @@ jobs:
       - name: Run clang-tidy for PC backend
         run: |
           nix develop --command bash -c '
+            set -o pipefail
+            
             # Configure with PC backend (default)
             cmake -S. -Bbuild-pc-tidy -DENABLE_CLANG_TIDY=ON
             
@@ -189,6 +191,8 @@ jobs:
       - name: Run clang-tidy for STM32 backend
         run: |
           nix develop --command bash -c '
+            set -o pipefail
+            
             # Configure with STM32 backend
             cmake -S. -Bbuild-stm32-tidy \
               -DGE_HAL_STM32=ON \
