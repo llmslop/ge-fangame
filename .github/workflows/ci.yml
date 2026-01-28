@@ -144,13 +144,13 @@ jobs:
         run: |
           nix develop --command bash -c '
             set -o pipefail
-            
+
             # Configure with PC backend (default)
             cmake -S. -Bbuild-pc-tidy -DENABLE_CLANG_TIDY=ON
-            
+
             # Run clang-tidy by building
             cmake --build build-pc-tidy --config Release 2>&1 | tee clang-tidy-pc.log
-            
+
             # Check for any warnings or errors
             if grep -i "warning:" clang-tidy-pc.log || grep -i "error:" clang-tidy-pc.log; then
               echo "clang-tidy found issues (warnings/errors logged)"
@@ -196,16 +196,16 @@ jobs:
         run: |
           nix develop --command bash -c '
             set -o pipefail
-            
+
             # Configure with STM32 backend
             cmake -S. -Bbuild-stm32-tidy \
               -DGE_HAL_STM32=ON \
               -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake \
               -DENABLE_CLANG_TIDY=ON
-            
+
             # Run clang-tidy by building
             cmake --build build-stm32-tidy --config Release 2>&1 | tee clang-tidy-stm32.log
-            
+
             # Check for any warnings or errors
             if grep -i "warning:" clang-tidy-stm32.log || grep -i "error:" clang-tidy-stm32.log; then
               echo "clang-tidy found issues (warnings/errors logged)"
