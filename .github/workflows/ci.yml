@@ -115,3 +115,102 @@ jobs:
           name: ge-app-arm-stm32
           path: build-arm/ge-app/Release/ge-app
           retention-days: 7
+
+  clang-tidy-pc:
+    name: clang-tidy for PC Backend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v15
+        with:
+          name: devenv
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          skipPush: true
+
+      - name: Run clang-tidy for PC backend
+        run: |
+          nix develop --command bash -c '
+            # Configure with PC backend (default)
+            cmake -S. -Bbuild-pc-tidy -DENABLE_CLANG_TIDY=ON
+            
+            # Run clang-tidy by building
+            cmake --build build-pc-tidy --config Release 2>&1 | tee clang-tidy-pc.log
+            
+            # Check for any warnings or errors
+            if grep -i "warning:" clang-tidy-pc.log || grep -i "error:" clang-tidy-pc.log; then
+              echo "clang-tidy found issues (warnings/errors logged)"
+              exit 0  # Don'\''t fail the build on warnings for now
+            else
+              echo "clang-tidy passed with no issues"
+            fi
+          '
+
+      - name: Upload clang-tidy PC log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: clang-tidy-pc-log
+          path: clang-tidy-pc.log
+          retention-days: 7
+
+  clang-tidy-stm32:
+    name: clang-tidy for STM32 Backend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v15
+        with:
+          name: devenv
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          skipPush: true
+
+      - name: Run clang-tidy for STM32 backend
+        run: |
+          nix develop --command bash -c '
+            # Configure with STM32 backend
+            cmake -S. -Bbuild-stm32-tidy \
+              -DGE_HAL_STM32=ON \
+              -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake \
+              -DENABLE_CLANG_TIDY=ON
+            
+            # Run clang-tidy by building
+            cmake --build build-stm32-tidy --config Release 2>&1 | tee clang-tidy-stm32.log
+            
+            # Check for any warnings or errors
+            if grep -i "warning:" clang-tidy-stm32.log || grep -i "error:" clang-tidy-stm32.log; then
+              echo "clang-tidy found issues (warnings/errors logged)"
+              exit 0  # Don'\''t fail the build on warnings for now
+            else
+              echo "clang-tidy passed with no issues"
+            fi
+          '
+
+      - name: Upload clang-tidy STM32 log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: clang-tidy-stm32-log
+          path: clang-tidy-stm32.log
+          retention-days: 7
