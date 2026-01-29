@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "ge-hal/stm/audio.hpp"
 #include "ge-hal/stm/dma2d.hpp"
 #include "ge-hal/stm/framebuffer.hpp"
 #include "ge-hal/stm/gpio.hpp"
@@ -92,6 +93,9 @@ App::App() {
   hal::stm::init_ltdc();
   hal::stm::init_dma2d();
 
+  // Initialize audio subsystem for MAX98357A amplifier
+  hal::stm::audio_engine_init();
+
   // Initialize button GPIO pins as inputs with pull-up resistors and enable
   // interrupts
   for (const auto &pin : button_pins) {
@@ -167,25 +171,23 @@ void App::loop() {
 }
 
 void App::audio_bgm_play(const std::uint8_t *data, std::size_t len, bool loop) {
-  (void)data;
-  (void)len;
-  (void)loop;
+  hal::stm::audio_engine_bgm_play(data, len, loop);
 }
 
-void App::audio_bgm_stop() {}
+void App::audio_bgm_stop() { hal::stm::audio_engine_bgm_stop(); }
 
-bool App::audio_bgm_is_playing() { return false; }
+bool App::audio_bgm_is_playing() { return hal::stm::audio_engine_bgm_is_playing(); }
 
 void App::audio_sfx_play(const std::uint8_t *data, std::size_t len,
                          std::size_t rate) {
-  (void)data;
-  (void)len;
-  (void)rate;
+  hal::stm::audio_engine_sfx_play(data, len, rate);
 }
 
-void App::audio_sfx_stop_all() {}
+void App::audio_sfx_stop_all() { hal::stm::audio_engine_sfx_stop_all(); }
 
-void App::audio_set_master_volume(std::uint8_t vol) { (void)vol; }
+void App::audio_set_master_volume(std::uint8_t vol) {
+  hal::stm::audio_engine_set_volume(vol);
+}
 
 void App::request_quit() {
   // On STM32, the app runs indefinitely; this is a no-op
