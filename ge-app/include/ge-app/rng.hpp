@@ -32,5 +32,17 @@ inline f32 next_float() {
   auto r = next() >> 8;
   return r * (1.0f / 16777216.0f);
 }
+
+// Generate a random integer in [0, max)
+inline u32 next_int(u32 max) {
+  if (max == 0)
+    return 0;
+  u32 threshold = -max % max; // equivalent to (UINT32_MAX - max + 1) % max
+  u32 r;
+  do {
+    r = next();
+  } while (r < threshold);
+  return r % max;
+}
 } // namespace rng
 } // namespace ge
