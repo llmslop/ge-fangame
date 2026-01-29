@@ -1,4 +1,6 @@
-#include "ge-app/scenes/game/world/sky.hpp"
+#include "ge-app/game/sky.hpp"
+#include "assets/out/textures/moon.h"
+#include "assets/out/textures/sun.h"
 
 namespace ge {
 
@@ -110,10 +112,19 @@ inline u16 cloud_from_sky(u16 sky, float t) {
   return c;
 }
 
+Sky::Sky()
+    : sun_texture{sun, sun_WIDTH, sun_HEIGHT, sun_FORMAT_CPP},
+      moon_texture{moon, moon_WIDTH, moon_HEIGHT, moon_FORMAT_CPP} {}
+
+u8 Sky::luminance_at_time(float t) {
+  u16 sc = sky_color(t);
+  return luminance565(sc);
+}
+
 void Sky::render(App &app, Surface render_region, Clock &clock) {
-  x_offset = clock.get_game_timer().get(app) / 1000 % CLOUD_TEXTURE_WIDTH;
-  sky_color = ::ge::sky_color(clock.time_in_day(app));
-  cloud_color = cloud_from_sky(sky_color, clock.time_in_day(app));
+  auto x_offset = clock.get_game_timer().get(app) / 1000 % CLOUD_TEXTURE_WIDTH;
+  auto sky_color = ::ge::sky_color(clock.time_in_day(app));
+  auto cloud_color = cloud_from_sky(sky_color, clock.time_in_day(app));
 
   const int W = render_region.get_width();
   const int H = render_region.get_height();
@@ -132,8 +143,13 @@ void Sky::render(App &app, Surface render_region, Clock &clock) {
   assert(H == 80);
   int stride = bg_clouds_len / H;
 
-  auto sun = render_sun(render_region, clock.time_in_day(app));
+  auto sun = render_celestial_object(sun_texture, render_region,
+                                     clock.time_in_day(app), sky_color);
   bool sun_visible = (sun.w > 0 && sun.h > 0);
+  auto moon = render_celestial_object(
+      moon_texture, render_region,
+      std::fmod(clock.time_in_day(app) + 0.5f, 1.0f), sky_color);
+  bool moon_visible = (moon.w > 0 && moon.h > 0);
 
   for (i32 dy = 0; dy < CLOUD_TEXTURE_HEIGHT; ++dy) {
     const u8 *row_rle = &bg_clouds[CLOUD_ROW_OFFSETS[dy]];
@@ -162,35 +178,39 @@ void Sky::render(App &app, Surface render_region, Clock &clock) {
 
         span_len = std::min(span_len, W - dx);
 
-        // fast path: no sun on this row or this span
-        if (!sun_row || dx + span_len <= sun.x || dx >= sun.x + sun.w) {
+        auto overlaps = [&](const Sky::Rect &r) {
+          return r.w > 0 && y >= r.y && y < r.y + r.h &&
+                 !(dx + span_len <= r.x || dx >= r.x + r.w);
+        };
+
+        bool sun_hit = sun_visible && overlaps(sun);
+        bool moon_hit = moon_visible && overlaps(moon);
+
+        // fast path: no celestial overlap at all
+        if (!sun_hit && !moon_hit) {
           hal::gpu::fill(fb.subsurface(dx, y, span_len, 1), cloud_lut[value]);
           return;
         }
 
-        // split span against sun
-        i32 x0 = dx;
-        i32 x1 = dx + span_len;
+        // slow path: per-pixel blend where needed
+        for (i32 x = dx; x < dx + span_len; ++x) {
+          u16 out = cloud_lut[value];
 
-        i32 ox0 = std::max<i32>(x0, sun.x);
-        i32 ox1 = std::min<i32>(x1, sun.x + sun.w);
+          // sun already drawn into framebuffer
+          if (sun_visible && x >= sun.x && x < sun.x + sun.w && y >= sun.y &&
+              y < sun.y + sun.h) {
+            u16 bg = fb.get_pixel(x, y);
+            out = blend_rgb565(bg, cloud_color, CLOUD_COLORS[value]);
+          }
 
-        // left (no sun)
-        if (x0 < ox0) {
-          hal::gpu::fill(fb.subsurface(x0, y, ox0 - x0, 1), cloud_lut[value]);
-        }
+          // moon already drawn into framebuffer
+          if (moon_visible && x >= moon.x && x < moon.x + moon.w &&
+              y >= moon.y && y < moon.y + moon.h) {
+            u16 bg = fb.get_pixel(x, y);
+            out = blend_rgb565(bg, cloud_color, CLOUD_COLORS[value]);
+          }
 
-        // middle (sun overlap → manual blend)
-        for (i32 x = ox0; x < ox1; ++x) {
-          assert(fb.get_pixel_format() == PixelFormat::RGB565);
-          u16 bg = fb.get_pixel(x, y); // sun already drawn
-          u16 out = blend_rgb565(bg, cloud_color, CLOUD_COLORS[value]);
           fb.set_pixel(x, y, out);
-        }
-
-        // right (no sun)
-        if (ox1 < x1) {
-          hal::gpu::fill(fb.subsurface(ox1, y, x1 - ox1, 1), cloud_lut[value]);
         }
       };
 
@@ -208,64 +228,46 @@ void Sky::render(App &app, Surface render_region, Clock &clock) {
   }
 }
 
-Sky::Rect Sky::render_sun(Surface fb, float t) {
+Sky::Rect Sky::render_celestial_object(const TextureARGB8888 &texture,
+                                       Surface fb, float t, u16 sky_color) {
   constexpr float SUNRISE = 0.25f;
   constexpr float SUNSET = 0.75f;
 
   if (t < SUNRISE || t > SUNSET)
     return {0, 0, 0, 0};
 
-  float day_t = (t - SUNRISE) / (SUNSET - SUNRISE);
-  day_t = clamp01(day_t);
+  float day_t = clamp01((t - SUNRISE) / (SUNSET - SUNRISE));
 
   const i32 W = fb.get_width();
   const i32 H = fb.get_height();
 
-  const i32 SUN_W = sun_texture.get_width();
-  const i32 SUN_H = sun_texture.get_height();
+  const i32 SUN_W = texture.get_width();
+  const i32 SUN_H = texture.get_height();
 
   // --- center-based position ---
   i32 cx = i32(day_t * (W + SUN_W)) - SUN_W / 2;
+  i32 cy = i32((H - 12) - std::sin(day_t * M_PI) * (H - 22));
 
-  float h = std::sin(day_t * M_PI);
-  i32 cy = i32((H - 12) - h * (H - 22));
+  // --- top-left ---
+  i32 dst_x = cx - SUN_W / 2;
+  i32 dst_y = cy - SUN_H / 2;
 
-  // --- convert to top-left ---
-  i32 x0 = cx - SUN_W / 2;
-  i32 y0 = cy - SUN_H / 2;
-
-  // --- clip against framebuffer ---
   i32 src_x = 0;
   i32 src_y = 0;
-  i32 dst_x = x0;
-  i32 dst_y = y0;
   i32 draw_w = SUN_W;
   i32 draw_h = SUN_H;
 
-  if (dst_x < 0) {
-    src_x -= dst_x;
-    draw_w += dst_x;
-    dst_x = 0;
-  }
-  if (dst_y < 0) {
-    src_y -= dst_y;
-    draw_h += dst_y;
-    dst_y = 0;
-  }
-  if (dst_x + draw_w > W)
-    draw_w = W - dst_x;
-  if (dst_y + draw_h > H)
-    draw_h = H - dst_y;
-
-  if (draw_w <= 0 || draw_h <= 0)
+  if (!clip_blit_rect(W, H, dst_x, dst_y, src_x, src_y, draw_w, draw_h))
     return {0, 0, 0, 0};
 
-  // --- now everything is valid u32 ---
-  auto dst =
-      sun_texture.subsurface(u32(src_x), u32(src_y), u32(draw_w), u32(draw_h));
-  auto src = fb.subsurface(u32(dst_x), u32(dst_y), u32(draw_w), u32(draw_h));
-  hal::gpu::blit_blend(src, dst, 0xFF);
+  auto src =
+      texture.subsurface(u32(src_x), u32(src_y), u32(draw_w), u32(draw_h));
 
-  return Rect{dst_x, dst_y, draw_w, draw_h};
+  auto dst = fb.subsurface(u32(dst_x), u32(dst_y), u32(draw_w), u32(draw_h));
+
+  hal::gpu::fill(dst, sky_color);
+  hal::gpu::blit_blend(dst, src, 0xFF);
+
+  return {dst_x, dst_y, draw_w, draw_h};
 }
 } // namespace ge

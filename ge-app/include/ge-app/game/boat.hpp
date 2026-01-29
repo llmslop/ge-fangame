@@ -1,6 +1,8 @@
 #pragma once
 
 #include "assets/out/textures/default-boat.h"
+#include "ge-app/aabb.hpp"
+#include "ge-app/game/player_stats.hpp"
 #include "ge-app/texture.hpp"
 #include "ge-hal/app.hpp"
 #include <cmath>
@@ -31,7 +33,7 @@ class Boat {
 public:
   u32 get_width() const { return boat.get_width(); }
   u32 get_height() const { return boat.get_height(); }
-  void render(Surface region) {
+  void render(Surface region, const PlayerStats &stats) {
     auto angle_to_8dir = [](float angle) {
       // normalize to [0, 2π)
       angle = std::fmod(angle, 2.0f * M_PI);
@@ -53,10 +55,41 @@ public:
     //                   angle);
     //
     // region is a 64x64 region, but the boat texture is 32x64 only
-    region = region.subsurface((region.get_width() - boat.get_width()) / 2,
-                               (region.get_height() - boat.get_height()) / 2,
-                               boat.get_width(), boat.get_height());
-    boat.blit(region);
+    auto boat_region =
+        region.subsurface((region.get_width() - boat.get_width()) / 2,
+                          (region.get_height() - boat.get_height()) / 2,
+                          boat.get_width(), boat.get_height());
+    boat.blit_blend(boat_region, 0xFF);
+
+    // render three mini 32 (region.get_width())x1 lines for HP, Food, Stamina
+    auto hp_region = region.subsurface(
+        (region.get_width() - boat.get_width()) / 2,
+        (region.get_height() - boat.get_height()) / 2,
+        boat.get_width() * stats.get_ship_hp() / stats.get_max_ship_hp(), 1);
+    hal::gpu::fill(hp_region, 0xF800); // Red
+    auto food_region = region.subsurface(
+        (region.get_width() - boat.get_width()) / 2,
+        (region.get_height() - boat.get_height()) / 2 + 1,
+        boat.get_width() * stats.get_food_percent() / 100.0f, 1);
+    hal::gpu::fill(food_region, 0xFBE0); // Green
+    auto stamina_region = region.subsurface(
+        (region.get_width() - boat.get_width()) / 2,
+        (region.get_height() - boat.get_height()) / 2 + 2,
+        boat.get_width() * stats.get_stamina_percent() / 100.0f, 1);
+    hal::gpu::fill(stamina_region, 0x07FF); // Blue
+  }
+
+  AABB hitbox() const {
+    // Simple AABB hitbox around boat
+    auto texture_aabb = AABB{
+        get_x(),
+        get_y(),
+        get_x() + static_cast<i32>(get_width()),
+        get_y() + static_cast<i32>(get_height()),
+    };
+
+    // Shrink hitbox slightly, since boat sprite has some transparent padding
+    return texture_aabb;
   }
 
   float get_angle() const { return angle; }

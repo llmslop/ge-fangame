@@ -12,7 +12,7 @@ WaterScene::WaterScene(WorldScene &parent)
 void WaterScene::render(Surface &fb_region) {
   auto &clock = parent.get_clock();
   auto &boat = parent.get_boat();
-  water.render(parent.water_region(fb_region), clock.time_in_day(app),
+  water.render(&app, parent.water_region(fb_region), clock.time_in_day(app),
                boat.get_x(), boat.get_y());
 }
 

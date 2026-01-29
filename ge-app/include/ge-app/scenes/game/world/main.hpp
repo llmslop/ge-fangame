@@ -11,6 +11,7 @@
 #include "ge-app/scenes/game/world/boat.hpp"
 #include "ge-app/scenes/game/world/dock.hpp"
 #include "ge-app/scenes/game/world/fishing.hpp"
+#include "ge-app/scenes/game/world/obstacles.hpp"
 #include "ge-app/scenes/game/world/sky.hpp"
 #include "ge-app/scenes/game/world/time_update.hpp"
 #include "ge-app/scenes/game/world/water.hpp"
@@ -40,6 +41,8 @@ class WorldDtSetter {
 class WorldScene : public ContainerScene {
 public:
   WorldScene(GameScene &parent);
+
+  void start_new_game() { time_update_scene.start_new_game(); }
 
   Clock &get_clock() { return time_update_scene.get_clock(); }
   PlayerStats &get_player_stats() {
@@ -84,11 +87,12 @@ private:
   world::SkyScene sky_scene;
   world::WaterScene water_scene;
   world::DockScene dock_scene;
+  world::ObstacleScene obstacle_scene;
   world::BoatScene boat_scene;
   world::FishingScene fishing_scene;
-  std::array<Scene *, 6> subscenes = {&time_update_scene, &sky_scene,
-                                      &water_scene,       &dock_scene,
-                                      &boat_scene,        &fishing_scene};
+  std::array<Scene *, 7> subscenes = {
+      &time_update_scene, &sky_scene,  &water_scene,  &dock_scene,
+      &obstacle_scene,    &boat_scene, &fishing_scene};
 };
 
 } // namespace game

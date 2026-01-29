@@ -8,6 +8,7 @@
 #include "ge-hal/stm/dma2d.hpp"
 #include "ge-hal/stm/framebuffer.hpp"
 #include "ge-hal/stm/gpio.hpp"
+#include "ge-hal/stm/joystick.hpp"
 #include "ge-hal/stm/sdram.hpp"
 #include "ge-hal/stm/time.hpp"
 #include "stm32f429xx.h"
@@ -20,7 +21,7 @@ namespace ge {
 namespace {
 // Button GPIO pins (to be configured based on actual hardware)
 constexpr hal::stm::Pin BUTTON1_PIN{'A', 0};
-constexpr hal::stm::Pin BUTTON2_PIN{'A', 1};
+constexpr hal::stm::Pin BUTTON2_PIN{'C', 13};
 constexpr int NUM_BUTTONS = 2;
 
 // Button state tracking for event detection
@@ -82,6 +83,13 @@ void App::system_init() {
   enable_fpu();
   config_flash();
   hal::stm::setup_clock();
+  RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
+
+  NVIC_SetPriority(EXTI0_IRQn, 5);
+  NVIC_EnableIRQ(EXTI0_IRQn);
+
+  NVIC_SetPriority(EXTI15_10_IRQn, 5);
+  NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
 App::App() {
@@ -91,6 +99,7 @@ App::App() {
   hal::stm::init_sdram();
   hal::stm::init_ltdc();
   hal::stm::init_dma2d();
+  hal::stm::init_joystick_dma_adc();
 
   // Initialize button GPIO pins as inputs with pull-up resistors and enable
   // interrupts
@@ -111,8 +120,29 @@ static u32 buffer_index = 0;
 std::int64_t App::now() { return hal::stm::systick_get(); }
 
 JoystickState App::get_joystick_state() {
+  constexpr int JOY_MIN = 0;
+  constexpr int JOY_MAX = 4095;
+  constexpr int JOY_CENTER_X = 2453;
+  constexpr int JOY_CENTER_Y = 2112;
+  constexpr int DEADZONE = 100;
+
+  u16 x_raw = 0, y_raw = 0;
+  hal::stm::joystick_read(&x_raw, &y_raw);
+
+  auto normalize = [](u16 val, int center) -> float {
+    int delta = static_cast<int>(val) - center;
+    if (std::abs(delta) < DEADZONE) {
+      return 0.0f;
+    }
+    if (delta > 0) {
+      return static_cast<float>(delta) / static_cast<float>(JOY_MAX - center);
+    } else {
+      return static_cast<float>(delta) / static_cast<float>(center - JOY_MIN);
+    }
+  };
+
   // TODO: implement joystick reading
-  return {0.0f, 0.0f};
+  return {-normalize(x_raw, JOY_CENTER_X), normalize(y_raw, JOY_CENTER_Y)};
 }
 
 void App::log(const char *fmt, ...) {
@@ -204,11 +234,12 @@ void EXTI0_IRQHandler() {
   }
 }
 
-// EXTI1 interrupt handler (Button 2 on PA1)
-void EXTI1_IRQHandler() {
-  if (EXTI->PR & (1U << 1)) {
-    EXTI->PR = (1U << 1); // Clear pending bit
-    ge::handle_button_interrupt(1);
+// EXTI1 interrupt handler (Button 2 on PC13)
+void EXTI15_10_IRQHandler() {
+  // Check if Line 13 triggered (1 << 13)
+  if (EXTI->PR & (1U << 13)) {
+    EXTI->PR = (1U << 13);          // Clear pending
+    ge::handle_button_interrupt(1); // Call logic for button 2
   }
 }
 }

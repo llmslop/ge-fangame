@@ -11,7 +11,8 @@ namespace game {
 WorldScene::WorldScene(GameScene &parent)
     : ContainerScene(parent.get_app()), parent{parent},
       time_update_scene{*this}, sky_scene{*this}, water_scene{*this},
-      dock_scene{*this}, boat_scene{*this}, fishing_scene{*this} {
+      dock_scene{*this}, obstacle_scene(*this), boat_scene{*this},
+      fishing_scene{*this} {
   set_scenes(subscenes);
 }
 

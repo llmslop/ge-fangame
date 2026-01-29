@@ -17,6 +17,7 @@ void TimeUpdateScene::tick(float dt) {
   last_frame_world_time = now;
 
   player_stats.update(parent.get_world_dt(), parent.get_boat().get_angle(),
+                      parent.get_boat().get_y(),
                       parent.get_current_mode() == GameMode::Steering);
   clock.update_multiplier(app, parent.get_current_mode());
 }

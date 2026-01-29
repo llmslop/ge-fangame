@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ge-app/game/sky.hpp"
 #include "ge-app/gfx/color.hpp"
 #include "ge-app/texture.hpp"
 #include "ge-hal/app.hpp"
@@ -27,8 +28,12 @@ public:
   void set_water_color(std::uint16_t color) { water_color = color; }
   void set_sky_color(std::uint16_t color) { sky_color = color; }
 
-  void render(Surface region, float time, u32 x_offset, u32 y_offset) {
-    (void)time;
+  void render(App *app, Surface region, float time, u32 x_offset,
+              u32 y_offset) {
+    u32 frame_index = app ? (app->now() % (water_texture_FRAME_COUNT *
+                                           water_texture_FRAME_DURATIONS[0])) /
+                                water_texture_FRAME_DURATIONS[0]
+                          : 0;
 
     const u32 pw = pattern_width();
     const u32 ph = pattern_height();
@@ -36,10 +41,31 @@ public:
     x_offset = (pw - (x_offset % pw)) % pw;
     y_offset %= ph;
 
+    auto current_frame_water_pattern =
+        this->water_pattern.subsurface(pw * frame_index, 0, pw, ph);
+
     const u32 rw = region.get_width();
     const u32 rh = region.get_height();
 
     assert(rw == App::WIDTH);
+
+    u16 blend_result[water_texture_FRAME_WIDTH * water_texture_FRAME_HEIGHT];
+    Surface blend_surface{blend_result, pw, pw, ph, PixelFormat::RGB565};
+
+    // First, fill the blend surface with the water color
+    hal::gpu::fill(blend_surface, 0x0000);
+
+    // Then, blend with the water pattern
+    u32 sky_luminance = std::isnan(time) ? 0xFF : Sky::luminance_at_time(time);
+    sky_luminance = sky_luminance * 3 / 2 + 48;
+    if (sky_luminance > 255)
+      sky_luminance = 255;
+    // scale to 0-255 range for blending (approximation)
+    hal::gpu::blit_blend(blend_surface, current_frame_water_pattern,
+                         sky_luminance);
+
+    auto water_pattern = blend_surface.as_const();
+
     Surface row_region{row_memory, rw, rw, ph,
                        PixelFormat::RGB565}; // temporary row buffer
     // 1. Render a full row (rw x ph) to the temporary region at (0, y_offset)
@@ -69,7 +95,7 @@ public:
     }
   }
 
-  u32 pattern_width() const { return water_pattern.get_width(); }
+  u32 pattern_width() const { return water_texture_FRAME_WIDTH; }
   u32 pattern_height() const { return water_pattern.get_height(); }
 
 private:

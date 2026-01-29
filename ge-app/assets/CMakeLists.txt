@@ -155,11 +155,11 @@ function(raw_image_animated SYMBOL_NAME IMAGE_FILE)
         ${ARGN}
     )
 
-    # Default mode is argb1555 for animated images
-    # (animated images often have transparency for sprite composition)
-    if(NOT RAW_IMAGE_ANIM_MODE)
-        set(RAW_IMAGE_ANIM_MODE argb1555)
-    endif()
+    # # Default mode is argb1555 for animated images
+    # # (animated images often have transparency for sprite composition)
+    # if(NOT RAW_IMAGE_ANIM_MODE)
+    #     set(RAW_IMAGE_ANIM_MODE argb1555)
+    # endif()
 
     bin2c_generic(
         bin2c_image.py
@@ -177,10 +177,12 @@ raw_audio(bgm_menu out/sounds/menu-bgm.wav)
 
 raw_image_alpha(default_boat out/textures/default-boat.png)
 raw_image_alpha(sun out/textures/sun.png)
+raw_image_alpha(moon out/textures/moon.png)
 raw_image_alpha(compass_base out/textures/compass-base.png)
 raw_image_alpha(compass_needle out/textures/compass-needle.png)
 raw_image_alpha(crate out/textures/crate.png)
-raw_image(water_texture out/textures/watertexture.png)
+raw_image_animated(whirlpool out/textures/whirlpool.webp MODE argb8888)
+raw_image_animated(water_texture out/textures/watertexture.webp)
 raw_image(menu_bg out/textures/menu-bg.png)
 
 bitmap_font(font_pixeloid_9px src/fonts/Pixeloid/TTF/PixeloidSans.ttf 9)

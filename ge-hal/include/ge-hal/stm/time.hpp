@@ -5,7 +5,7 @@ namespace ge {
 namespace hal {
 namespace stm {
 
-static constexpr u32 PLL_HSI = 16, PLL_M = 8, PLL_N = 180, PLL_P = 2;
+static constexpr u32 PLL_HSI = 16, PLL_M = 8, PLL_N = 180, PLL_P = 2, PLL_Q = 7;
 static constexpr u32 APB1_PRE = 5, APB2_PRE = 4;
 static constexpr u32 SYS_FREQUENCY =
     ((PLL_HSI * PLL_N / PLL_M / PLL_P) * 1000000);

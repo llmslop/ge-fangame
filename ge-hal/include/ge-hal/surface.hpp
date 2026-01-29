@@ -44,6 +44,21 @@ inline constexpr usize pixel_format_bpp(PixelFormat fmt) {
   }
 }
 
+inline bool has_alpha_channel(PixelFormat fmt) {
+  switch (fmt) {
+  case PixelFormat::ARGB8888:
+  case PixelFormat::ARGB1555:
+  case PixelFormat::ARGB4444:
+  case PixelFormat::AL88:
+  case PixelFormat::AL44:
+  case PixelFormat::A8:
+  case PixelFormat::A4:
+    return true;
+  default:
+    return false;
+  }
+}
+
 template <class ElemT> class BaseSurface {
 public:
   BaseSurface(std::nullptr_t = nullptr) {}

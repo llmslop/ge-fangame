@@ -91,9 +91,7 @@ void blit_blend(Surface dst, ConstSurface src, u8 global_alpha) {
   wait_idle();
   set_mode(Mode::M2M_BLEND);
   setup_output(dst);
-  setup_input(src, global_alpha,
-              // Alpha Mode: 0=NoMod, 1=Replace, 2=Combine (Multiply)
-              (global_alpha < 255) ? u8{2} : u8{0});
+  setup_input(src, global_alpha, 2);
   setup_background(dst);
   fire();
 }

@@ -14,6 +14,7 @@ void RootScene::start_game() {
   menu_scene.on_exit();
   current_screen = RootSceneScreen::Game;
   game_scene.on_enter();
+  game_scene.start_new_game();
 }
 
 void RootScene::exit() { app.request_quit(); }
