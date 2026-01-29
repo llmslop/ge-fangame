@@ -176,7 +176,9 @@ void App::audio_bgm_play(const std::uint8_t *data, std::size_t len, bool loop) {
 
 void App::audio_bgm_stop() { hal::stm::audio_engine_bgm_stop(); }
 
-bool App::audio_bgm_is_playing() { return hal::stm::audio_engine_bgm_is_playing(); }
+bool App::audio_bgm_is_playing() {
+  return hal::stm::audio_engine_bgm_is_playing();
+}
 
 void App::audio_sfx_play(const std::uint8_t *data, std::size_t len,
                          std::size_t rate) {

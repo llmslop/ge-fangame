@@ -58,13 +58,9 @@ void audio_engine_bgm_play(const u8 *data, std::size_t length, bool loop) {
   }
 }
 
-void audio_engine_bgm_stop() {
-  g_audio_engine.bgm.active = false;
-}
+void audio_engine_bgm_stop() { g_audio_engine.bgm.active = false; }
 
-bool audio_engine_bgm_is_playing() {
-  return g_audio_engine.bgm.active;
-}
+bool audio_engine_bgm_is_playing() { return g_audio_engine.bgm.active; }
 
 void audio_engine_sfx_play(const u8 *data, std::size_t length,
                            std::size_t sample_rate) {
@@ -105,9 +101,7 @@ void audio_engine_sfx_stop_all() {
   }
 }
 
-void audio_engine_set_volume(u8 vol) {
-  g_audio_engine.master_volume = vol;
-}
+void audio_engine_set_volume(u8 vol) { g_audio_engine.master_volume = vol; }
 
 void audio_engine_fill_buffer() {
   if (!g_audio_engine.active) {

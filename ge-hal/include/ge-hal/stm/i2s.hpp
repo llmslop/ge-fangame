@@ -9,16 +9,17 @@ namespace hal {
 namespace stm {
 
 // MAX98357A is a mono I2S DAC with integrated amplifier
-// It only requires I2S signals: BCLK (bit clock), LRCK (word select), DIN (data)
-// No separate chip select or enable pin needed (SD pin can be used for gain/shutdown)
+// It only requires I2S signals: BCLK (bit clock), LRCK (word select), DIN
+// (data) No separate chip select or enable pin needed (SD pin can be used for
+// gain/shutdown)
 
 // I2S configuration for audio output
 struct I2SConfig {
-  SPI_TypeDef *spi;      // SPI peripheral used for I2S (SPI2 or SPI3)
-  Pin ws;                // Word select (LRCK)
-  Pin ck;                // Bit clock (BCLK)
-  Pin sd;                // Serial data (DIN to MAX98357A)
-  u8 af;                 // Alternate function number
+  SPI_TypeDef *spi; // SPI peripheral used for I2S (SPI2 or SPI3)
+  Pin ws;           // Word select (LRCK)
+  Pin ck;           // Bit clock (BCLK)
+  Pin sd;           // Serial data (DIN to MAX98357A)
+  u8 af;            // Alternate function number
   DMA_Stream_TypeDef *dma_stream;
   u8 dma_channel;
   IRQn_Type dma_irqn;

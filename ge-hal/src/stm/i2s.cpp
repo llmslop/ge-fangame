@@ -1,6 +1,7 @@
 #include "ge-hal/stm/i2s.hpp"
 #include "ge-hal/stm/audio.hpp"
 #include "ge-hal/stm/time.hpp"
+#include <initializer_list>
 
 namespace ge {
 namespace hal {
@@ -41,7 +42,7 @@ void I2SHandle::init(const I2SConfig &config, u32 sample_rate) {
   // - DATLEN = 00: 16-bit data
   // - CHLEN = 0: 16-bit per channel
 
-  u32 i2scfgr = SPI_I2SCFGR_I2SMOD |       // I2S mode
+  u32 i2scfgr = SPI_I2SCFGR_I2SMOD |              // I2S mode
                 (0b10 << SPI_I2SCFGR_I2SCFG_Pos); // Master transmit
 
   // Calculate I2S clock divider for desired sample rate
@@ -51,8 +52,8 @@ void I2SHandle::init(const I2SConfig &config, u32 sample_rate) {
 
   // Enable PLLI2S
   // Configure PLLI2S: PLLI2SN=192, PLLI2SR=5 for 48kHz-compatible rates
-  RCC->PLLI2SCFGR = (192 << RCC_PLLI2SCFGR_PLLI2SN_Pos) |
-                    (5 << RCC_PLLI2SCFGR_PLLI2SR_Pos);
+  RCC->PLLI2SCFGR =
+      (192 << RCC_PLLI2SCFGR_PLLI2SN_Pos) | (5 << RCC_PLLI2SCFGR_PLLI2SR_Pos);
   RCC->CR |= RCC_CR_PLLI2SON;
   while (!(RCC->CR & RCC_CR_PLLI2SRDY)) {
     delay_spin(1);
@@ -91,7 +92,7 @@ void I2SHandle::init(const I2SConfig &config, u32 sample_rate) {
 
   // Clear all DMA interrupt flags for Stream4
   DMA1->HIFCR = DMA_HIFCR_CTCIF4 | DMA_HIFCR_CHTIF4 | DMA_HIFCR_CTEIF4 |
-               DMA_HIFCR_CDMEIF4 | DMA_HIFCR_CFEIF4;
+                DMA_HIFCR_CDMEIF4 | DMA_HIFCR_CFEIF4;
 
   // DMA configuration:
   // - Channel 0
@@ -102,14 +103,14 @@ void I2SHandle::init(const I2SConfig &config, u32 sample_rate) {
   // - High priority
   // - Half-transfer and transfer-complete interrupts
   dma_stream->CR = (config.dma_channel << DMA_SxCR_CHSEL_Pos) |
-                   DMA_SxCR_DIR_0 |       // Memory to peripheral
-                   DMA_SxCR_CIRC |        // Circular mode
-                   DMA_SxCR_MINC |        // Memory increment
-                   DMA_SxCR_MSIZE_0 |     // 16-bit memory size
-                   DMA_SxCR_PSIZE_0 |     // 16-bit peripheral size
-                   DMA_SxCR_PL_1 |        // High priority
-                   DMA_SxCR_HTIE |        // Half-transfer interrupt
-                   DMA_SxCR_TCIE;         // Transfer-complete interrupt
+                   DMA_SxCR_DIR_0 |   // Memory to peripheral
+                   DMA_SxCR_CIRC |    // Circular mode
+                   DMA_SxCR_MINC |    // Memory increment
+                   DMA_SxCR_MSIZE_0 | // 16-bit memory size
+                   DMA_SxCR_PSIZE_0 | // 16-bit peripheral size
+                   DMA_SxCR_PL_1 |    // High priority
+                   DMA_SxCR_HTIE |    // Half-transfer interrupt
+                   DMA_SxCR_TCIE;     // Transfer-complete interrupt
 
   dma_stream->PAR = reinterpret_cast<u32>(&spi->DR);
 
@@ -133,7 +134,7 @@ void I2SHandle::start_dma(const i16 *buffer, u32 length) {
 
   // Clear DMA interrupt flags
   DMA1->HIFCR = DMA_HIFCR_CTCIF4 | DMA_HIFCR_CHTIF4 | DMA_HIFCR_CTEIF4 |
-               DMA_HIFCR_CDMEIF4 | DMA_HIFCR_CFEIF4;
+                DMA_HIFCR_CDMEIF4 | DMA_HIFCR_CFEIF4;
 
   // Configure DMA transfer
   dma_stream->M0AR = reinterpret_cast<u32>(buffer);
