@@ -29,8 +29,26 @@ CMake generator.
 > [!NOTE]
 > This project only supports the Discovery kit with STM32F429ZI MCU.
 > Clocks, pins and peripherals are configured based on this kit alone.
-> Once input and audio is supported, wiring instructions will be properly
-> documented in this README file.
+
+#### Hardware Wiring
+
+**Audio (MAX98357A I2S Amplifier)**
+
+| MAX98357A Pin | STM32F429 Pin | Description |
+|---------------|---------------|-------------|
+| VIN           | 3.3V          | Power supply |
+| GND           | GND           | Ground |
+| BCLK          | PB13          | I2S Bit Clock |
+| LRCK          | PB12          | I2S Word Select |
+| DIN           | PC3           | I2S Serial Data |
+| SD            | (optional)    | Shutdown/Gain control |
+
+**Buttons**
+
+| Button | STM32F429 Pin | Description |
+|--------|---------------|-------------|
+| Button 1 | PA0         | User button 1 (internal pull-up) |
+| Button 2 | PA1         | User button 2 (internal pull-up) |
 
 To build for STM32, only the `arm-none-eabi-gcc` toolchain is supported. LLVM
 might work but some of the STM32-specific code heavily depends on GNU compiler
