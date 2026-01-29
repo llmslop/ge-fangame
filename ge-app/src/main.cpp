@@ -1,10 +1,11 @@
 #include "ge-app/scenes/main.hpp"
+#include "ge-app/rng.hpp"
 #include "ge-hal/app.hpp"
 #include "ge-hal/surface.hpp"
 
 namespace ge {
 
-class MainApp : public ge::App {
+class MainApp : public App {
 public:
   MainApp() : root_scene(*this) {}
 
@@ -18,12 +19,16 @@ public:
 
   void render(Surface &fb) override {
     App::render(fb);
+    auto start = now();
     root_scene.render(fb);
+    auto end = now();
+    // log("Frame render time: %d ms", static_cast<int>(end - start));
   }
 
   void on_button_clicked(Button btn) override {
     App::on_button_clicked(btn);
     root_scene.on_button_clicked(btn);
+    log("Button %d clicked", static_cast<int>(btn));
   }
 
   void on_button_held(Button btn) override {
@@ -43,6 +48,7 @@ private:
 } // namespace ge
 
 int main() {
+  ge::rng::init_seed();
   ge::MainApp app;
   app.loop();
   return 0;

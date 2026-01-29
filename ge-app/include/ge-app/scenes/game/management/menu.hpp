@@ -16,6 +16,7 @@ namespace mgmt {
 enum class Action {
   ViewStatus,
   ViewInventory,
+  ViewMap,
 };
 
 class MenuScene : public Scene {
@@ -63,7 +64,7 @@ private:
   ManagementUIScene &parent;
 
   ui::Menu menu;
-  ui::MenuItem menu_items[2];
+  ui::MenuItem menu_items[3];
 };
 
 } // namespace mgmt

@@ -12,6 +12,7 @@ MenuScene::MenuScene(ManagementUIScene &parent)
       ui::MenuItem{"View Status", static_cast<int>(Action::ViewStatus)};
   menu_items[1] =
       ui::MenuItem{"View Inventory", static_cast<int>(Action::ViewInventory)};
+  menu_items[2] = ui::MenuItem{"View Map", static_cast<int>(Action::ViewMap)};
   menu.set_items(menu_items, GE_ARRAY_SIZE(menu_items));
 }
 
@@ -22,6 +23,9 @@ void MenuScene::on_menu_action(Action action) {
     break;
   case Action::ViewInventory:
     parent.show_inventory_screen();
+    break;
+  case Action::ViewMap:
+    parent.show_map_screen();
     break;
   default:
     break;

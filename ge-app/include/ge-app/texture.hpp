@@ -4,6 +4,7 @@
 #include "ge-hal/surface.hpp"
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 namespace ge {
 
@@ -31,6 +32,10 @@ public:
 
   void blit(const Surface &region) {
     hal::gpu::blit_blend(region, *this, 0xFF);
+  }
+
+  void blit_blend(const Surface &region, u8 alpha) {
+    hal::gpu::blit_blend(region, *this, alpha);
   }
 
   template <class Region>
@@ -78,13 +83,35 @@ public:
         if ((unsigned)sx < (unsigned)get_width() &&
             (unsigned)sy < (unsigned)get_height()) {
           auto col = *static_cast<const DType *>(pixel_at(sx, sy));
-          // HACK: using HAL GPU to blend alpha for us
-          auto dst = region.subsurface(x, y, 1, 1);
-          auto src = ConstSurface(&col, 1, 1, 1, format);
-          hal::gpu::blit_blend(dst, src, 0xFF);
-          // if (col & 0x8000) {
-          // region.set_pixel(x, y, col);
-          // }
+          if (!has_alpha_channel(format)) {
+            region.set_pixel(x, y, col);
+          } else if (format == PixelFormat::ARGB1555) {
+            if (col & 0x8000U) {
+              region.set_pixel(x, y, col);
+            }
+          } else if (format == PixelFormat::ARGB8888 &&
+                     region.get_pixel_format() == PixelFormat::RGB565) {
+            // for the time being we only support ARGB8888 -> RGB565 blit with
+            // alpha
+            auto src_color = region.get_pixel(x, y);
+            u8 src_r = (src_color >> 11) & 0x1F;
+            u8 src_g = (src_color >> 5) & 0x3F;
+            u8 src_b = src_color & 0x1F;
+            u8 dst_a = (col >> 24) & 0xFF;
+            u8 dst_r = (col >> 16) & 0xFF;
+            u8 dst_g = (col >> 8) & 0xFF;
+            u8 dst_b = col & 0xFF;
+            // Alpha blend
+            u8 out_r = (dst_r * dst_a + (src_r << 3) * (255 - dst_a)) / 255;
+            u8 out_g = (dst_g * dst_a + (src_g << 2) * (255 - dst_a)) / 255;
+            u8 out_b = (dst_b * dst_a + (src_b << 3) * (255 - dst_a)) / 255;
+            u16 out_color =
+                ((out_r >> 3) << 11) | ((out_g >> 2) << 5) | (out_b >> 3);
+            region.set_pixel(x, y, out_color);
+          } else {
+            std::printf("Unsupported format for blit_rotated with alpha\r\n");
+            return;
+          }
         }
       }
     }
@@ -94,5 +121,34 @@ public:
 using TextureRGB565 = Texture<PixelFormat::RGB565>;
 using TextureARGB1555 = Texture<PixelFormat::ARGB1555>;
 using TextureARGB8888 = Texture<PixelFormat::ARGB8888>;
+
+inline bool clip_blit_rect(i32 fb_w, i32 fb_h, i32 &dst_x, i32 &dst_y,
+                           i32 &src_x, i32 &src_y, i32 &w, i32 &h) {
+  // Clip left
+  if (dst_x < 0) {
+    i32 d = -dst_x;
+    src_x += d;
+    w -= d;
+    dst_x = 0;
+  }
+
+  // Clip top
+  if (dst_y < 0) {
+    i32 d = -dst_y;
+    src_y += d;
+    h -= d;
+    dst_y = 0;
+  }
+
+  // Clip right
+  if (dst_x + w > fb_w)
+    w = fb_w - dst_x;
+
+  // Clip bottom
+  if (dst_y + h > fb_h)
+    h = fb_h - dst_y;
+
+  return w > 0 && h > 0;
+}
 
 } // namespace ge

@@ -31,6 +31,10 @@ public:
   bool is_active() const override;
 
   void on_enter() { bgm.on_enter(); }
+  void start_new_game() {
+    world.start_new_game();
+    management_ui.back_to_menu();
+  }
   void on_exit() { bgm.on_exit(); }
 
 private:

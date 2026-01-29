@@ -97,12 +97,22 @@
                     gcc
                     clang-tools
                     gersemi
+                    sdl3
+                    python
                   ]
                   ++ enabledPackages;
 
                   extraJailOptions = with jail.combinators; [
                     (readonly configFile)
                     (readonly (lib.getExe package))
+                    (readonly (lib.getDev sdl3))
+                    (readonly (lib.getLib sdl3))
+                    (fwd-env "CMAKE_EXPORT_COMPILE_COMMANDS")
+                    (fwd-env "CMAKE_GENERATOR")
+                    (fwd-env "CMAKE_COLOR_DIAGNOSTICS")
+                    (fwd-env "PKG_CONFIG")
+                    (fwd-env "CMAKE_LIBRARY_PATH")
+                    (fwd-env "NIXPKGS_CMAKE_PREFIX_PATH")
                   ];
                 }
               ));

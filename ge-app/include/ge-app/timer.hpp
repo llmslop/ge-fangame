@@ -28,6 +28,13 @@ public:
   u32 get_multiplier_num() const { return multiplier_num; }
   u32 get_multiplier_den() const { return multiplier_den; }
 
+  void reset(i64 base_time = 0) {
+    multiplier_num = 1;
+    multiplier_den = 1;
+    accum = base_time;
+    last_state_change = 0;
+  }
+
 private:
   u32 multiplier_num = 1;
   u32 multiplier_den = 1;

@@ -194,8 +194,8 @@ void init_ltdc() {
                ((vsw + vbp + App::HEIGHT - 1) << LTDC_AWCR_AAH_Pos);
   LTDC->TWCR = ((hsw + hbp + App::WIDTH + hfp - 1) << LTDC_TWCR_TOTALW_Pos) |
                ((vsw + vbp + App::HEIGHT + vfp - 1) << LTDC_TWCR_TOTALH_Pos);
-  LTDC->LIPCR = 0;
-  LTDC->IER |= LTDC_IER_RRIE;
+  LTDC->LIPCR = App::HEIGHT + vbp + vsw - 1;
+  LTDC->IER |= LTDC_IER_LIE;
   NVIC_SetPriority(LTDC_IRQn, 0);
   NVIC_EnableIRQ(LTDC_IRQn);
 
@@ -238,19 +238,42 @@ void init_ltdc() {
 volatile bool vblank = false;
 
 bool begin_frame(u32 &buffer_index) {
-  // Check if vblank occurred
+  // 1. Basic check: Did the ISR fire?
   if (!vblank) {
-    // No vblank yet, don't render this iteration
     return false;
   }
 
-  // Vblank occurred, swap to the next buffer and prepare for rendering
-  LTDC_Layer1->CFBAR = reinterpret_cast<u32>(pixel_buffer(buffer_index));
-  vblank = false;
-  LTDC->SRCR = LTDC_SRCR_VBR;
-  buffer_index ^= 1;
+  // 2. TIMING CHECK (Crucial for Audio/Polling)
+  // Check if we are currently in the Active Video area.
+  // VDES (Vertical Data Enable) is High when pixels are being drawn.
+  if (LTDC->CDSR & LTDC_CDSR_VDES) {
+    // We are LATE. The screen is already drawing the old buffer again.
+    // If we wait now, we block for ~16ms.
+    // Instead, we skip this frame entirely to keep the CPU free for
+    // Audio/Logic.
+    vblank = false;
+    return false;
+  }
 
-  return true; // Signal that we should render this frame
+  // 3. We are in the Safe Zone (VBlank). Commit the Swap.
+  vblank = false;
+
+  LTDC_Layer1->CFBAR = reinterpret_cast<u32>(pixel_buffer(buffer_index));
+
+  // Since we verified we are in VBlank (via VDES check above),
+  // we can use Immediate Reload (IMR) safely, or VBR.
+  // VBR is the safest standard.
+  LTDC->SRCR = LTDC_SRCR_VBR;
+
+  // 4. Wait for hardware to accept the command
+  // Since we are in VBlank, this clears almost instantly.
+  while (LTDC->SRCR & LTDC_SRCR_VBR) {
+    delay_spin(1);
+  }
+
+  // 5. Give app the new buffer
+  buffer_index ^= 1;
+  return true;
 }
 
 } // namespace stm
@@ -259,9 +282,9 @@ bool begin_frame(u32 &buffer_index) {
 
 extern "C" void LTDC_IRQHandler() {
   using namespace ge::hal::stm;
-  if (LTDC->ISR & LTDC_ISR_RRIF) {
+  if (LTDC->ISR & LTDC_ISR_LIF) {
     // Clear the interrupt flag
-    LTDC->ICR = LTDC_ICR_CRRIF;
+    LTDC->ICR = LTDC_ICR_CLIF;
 
     // Signal the application
     vblank = true;

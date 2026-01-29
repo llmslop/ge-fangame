@@ -10,13 +10,22 @@ BoatUpdateScene::BoatUpdateScene(BoatScene &parent)
     : Scene(parent.get_app()), parent(parent) {}
 
 void BoatUpdateScene::render(Surface &fb_region) {
+  auto last_damage_time =
+      parent.parent.get_player_stats().get_last_taken_damage_time();
+  // flashing effect for 1s after taking damage (0.1s intervals)
+  if (last_damage_time >= 0 && app.now() - last_damage_time < 1000) {
+    if (static_cast<int>((app.now() - last_damage_time) / 100) % 2 == 0) {
+      return;
+    }
+  }
+
   auto &world = parent.parent;
   auto max_side = std::max(parent.boat.get_width(), parent.boat.get_height());
   auto water_region = world.water_region(fb_region);
   auto boat_region = water_region.subsurface(
       (water_region.get_width() - max_side) / 2,
       (water_region.get_height() - max_side) / 2, max_side, max_side);
-  parent.boat.render(boat_region);
+  parent.boat.render(boat_region, parent.parent.get_player_stats());
 }
 
 void BoatUpdateScene::tick(float dt) {

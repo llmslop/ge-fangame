@@ -11,7 +11,8 @@ DockScene::DockScene(WorldScene &parent)
 
 void DockScene::render(Surface &fb_region) {
   auto &boat = parent.get_boat();
-  dock.render(app, fb_region, boat.get_x(), boat.get_y());
+  auto &clock = parent.get_clock();
+  dock.render(app, fb_region, clock, boat.get_x(), boat.get_y());
 }
 
 } // namespace world

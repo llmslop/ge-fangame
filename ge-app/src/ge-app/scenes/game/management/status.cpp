@@ -96,6 +96,18 @@ void StatusScene::render(Surface &fb_region) {
 
   auto &player_stats = parent.get_player_stats();
 
+  // Ship HP
+  u32 ship_hp = player_stats.get_ship_hp();
+  u32 max_ship_hp = player_stats.get_max_ship_hp();
+  float ship_hp_percent =
+      (static_cast<float>(ship_hp) / static_cast<float>(max_ship_hp)) * 100.0f;
+  snprintf(inv_buf, sizeof(inv_buf), "  Ship HP: %u/%u", ship_hp, max_ship_hp);
+  font.render_colored(inv_buf, -1, fb_region, 10, y_pos, 0xF800);
+  y_pos += line_height;
+  draw_status_bar(fb_region.subsurface(20, y_pos, 100, 8), ship_hp_percent,
+                  0xF800);
+  y_pos += 12;
+
   // Food
   float food_percent = player_stats.get_food_percent();
   snprintf(inv_buf, sizeof(inv_buf), "  Food: %.0f%%", food_percent);

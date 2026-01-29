@@ -33,6 +33,8 @@ void setup_clock() {
   RCC->PLLCFGR &= 0xFFFF0000UL;
   RCC->PLLCFGR |= (((PLL_P - 2) >> 1) & 0x3UL) << 16;
   RCC->PLLCFGR |= PLL_M | (PLL_N << 6);
+  RCC->PLLCFGR |= (PLL_Q << 24);
+  RCC->PLLCFGR |= RCC_PLLCFGR_PLLSRC_HSI;
   RCC->CR |= RCC_CR_PLLON;
   while ((RCC->CR & RCC_CR_PLLRDY) == 0)
     delay_spin(1);

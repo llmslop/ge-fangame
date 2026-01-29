@@ -23,6 +23,12 @@ public:
   Clock &get_clock() { return clock; }
   PlayerStats &get_player_stats() { return player_stats; }
 
+  void start_new_game() {
+    last_frame_world_time = -1;
+    clock.reset();
+    player_stats = PlayerStats();
+  }
+
 private:
   WorldScene &parent;
 
