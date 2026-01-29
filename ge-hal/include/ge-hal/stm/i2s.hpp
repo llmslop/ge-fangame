@@ -46,15 +46,15 @@ struct I2SHandle {
 };
 
 // I2S configuration for SPI2 (commonly used for I2S audio)
-// Using typical pins for STM32F429:
+// Using pins for STM32F429-Discovery that avoid USB HS conflicts:
 // - PB12: I2S2_WS (Word Select / LRCK)
 // - PB13: I2S2_CK (Bit Clock / BCLK)
-// - PB15: I2S2_SD (Serial Data / DIN)
+// - PC3:  I2S2_SD (Serial Data / DIN) - avoids PB15 USB_HS_DP conflict
 static const I2SConfig I2S2_CONFIG = {
     .spi = SPI2,
     .ws = Pin('B', 12),
     .ck = Pin('B', 13),
-    .sd = Pin('B', 15),
+    .sd = Pin('C', 3),
     .af = 5, // AF5 for I2S2
     .dma_stream = DMA1_Stream4,
     .dma_channel = 0, // Channel 0 for SPI2_TX

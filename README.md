@@ -40,7 +40,7 @@ CMake generator.
 | GND           | GND           | Ground |
 | BCLK          | PB13          | I2S Bit Clock |
 | LRCK          | PB12          | I2S Word Select |
-| DIN           | PB15          | I2S Serial Data |
+| DIN           | PC3           | I2S Serial Data |
 | SD            | (optional)    | Shutdown/Gain control |
 
 **Buttons**
